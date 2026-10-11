@@ -669,8 +669,6 @@ export default function HomePage() {
   return (
     <main className="hyfux-page">
       <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@500;600;700;800;900&family=Yellowtail&display=swap');
-
         :root {
           --teal: #00f0e6;
           --teal-soft: #5ff7ef;
@@ -681,9 +679,9 @@ export default function HomePage() {
           --text: #f4f8fa;
           --muted: #9db0b7;
           --grad: linear-gradient(100deg, #00f0e6 0%, #3dffb0 26%, #ffe45c 58%, #ff8a1f 80%, #ff4d06 100%);
-          --font-display: 'Montserrat', 'Inter', system-ui, sans-serif;
-          --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-          --font-script: 'Yellowtail', 'Brush Script MT', cursive;
+          --font-display: var(--font-geist-sans), system-ui, sans-serif;
+          --font-body: var(--font-geist-sans), system-ui, sans-serif;
+          --font-script: 'Brush Script MT', cursive;
           color-scheme: dark;
           scroll-behavior: smooth;
         }
