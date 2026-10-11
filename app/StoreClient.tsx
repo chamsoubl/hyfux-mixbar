@@ -39,11 +39,11 @@ type Review = {
 const WHATSAPP_NUMBER = '+213669713608';
 
 const fallbackPhotos = [
-  'https://images.unsplash.com/photo-1513558161293-cdaf765edfd7?auto=format&fit=crop&w=900&q=85',
-  'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=900&q=85',
-  'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=900&q=85',
-  'https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=900&q=85',
-  'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=900&q=85',
+  'https://images.unsplash.com/photo-1513558161293-cdaf765edfd7?auto=format&fit=crop&w=640&q=72',
+  'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=640&q=72',
+  'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=640&q=72',
+  'https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=640&q=72',
+  'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=640&q=72',
 ];
 
 const cash = (price: number) =>
@@ -57,8 +57,8 @@ const whatsappReady = () => !WHATSAPP_NUMBER.includes('X');
 /*  picked up automatically. If a file is missing, a stock photo is    */
 /*  shown instead, so the page never looks broken.                     */
 /* ------------------------------------------------------------------ */
-const HERO_IMAGE = '/hero_banner.png';
-const ABOUT_IMAGE = '/about_drinks.png';
+const HERO_IMAGE = '/hero_banner.webp';
+const ABOUT_IMAGE = '/about_drinks.webp';
 
 const SOCIAL_LINKS = {
   instagram: 'https://instagram.com/chamsou__.bl',
@@ -2394,6 +2394,8 @@ export default function HomePage() {
           src={HERO_IMAGE}
           onError={imageFallback(fallbackPhotos[0])}
           alt="A colourful HYFUX mocktail served over ice"
+          fetchPriority="high"
+          decoding="async"
         />
 
         <div className="hx-container hx-hero-grid">
@@ -2564,6 +2566,7 @@ export default function HomePage() {
                     )}
                     alt={product.name}
                     loading="lazy"
+                    decoding="async"
                   />
                   <span className="hx-product-category">
                     {product.category || 'HYFUX Signature'}
@@ -2614,6 +2617,7 @@ export default function HomePage() {
               onError={imageFallback(fallbackPhotos[2])}
               alt="A selection of colourful HYFUX drinks"
               loading="lazy"
+              decoding="async"
             />
             <div className="hx-about-script" aria-hidden="true">
               <span>Crafted</span>
@@ -2896,6 +2900,8 @@ export default function HomePage() {
                         fallbackPhotos[index % fallbackPhotos.length],
                       )}
                       alt={item.product.name}
+                      loading="lazy"
+                      decoding="async"
                     />
 
                     <div className="hx-cart-info">
