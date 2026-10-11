@@ -342,25 +342,51 @@ export default function HomePage() {
 
     let cancelled = false;
 
+    async function refreshProducts() {
+      const { data, error: productsError } = await supabase
+        .from('products')
+        .select(
+          'id, name, description, price, image_url, category, available, sold_out',
+        )
+        .eq('available', true)
+        .order('name');
+
+      if (cancelled) return;
+
+      if (productsError) {
+        setError((previous) =>
+          previous
+            ? `${previous} The menu could not be loaded.`
+            : 'Unable to load the menu. Please check your connection.',
+        );
+      } else {
+        setProducts((data ?? []) as Product[]);
+      }
+    }
+
+    async function refreshReviews() {
+      const { data, error: reviewsError } = await supabase
+        .from('reviews')
+        .select('id, rating, comment, customer_name, created_at')
+        .eq('verified', true)
+        .or('hidden.is.null,hidden.eq.false')
+        .order('created_at', { ascending: false })
+        .limit(12);
+
+      if (!cancelled && !reviewsError) {
+        setReviews((data ?? []) as Review[]);
+      }
+    }
+
     async function loadShop() {
       setLoading(true);
       setError('');
 
-      const [settingsResult, productsResult] = await Promise.all([
-        supabase
-          .from('business_settings')
-          .select('is_open')
-          .eq('id', 1)
-          .maybeSingle(),
-
-        supabase
-          .from('products')
-          .select(
-            'id, name, description, price, image_url, category, available, sold_out',
-          )
-          .eq('available', true)
-          .order('name'),
-      ]);
+      const settingsResult = await supabase
+        .from('business_settings')
+        .select('is_open')
+        .eq('id', 1)
+        .maybeSingle();
 
       if (cancelled) return;
 
@@ -373,30 +399,14 @@ export default function HomePage() {
         setShopOpen(Boolean(settingsResult.data.is_open));
       }
 
-      if (productsResult.error) {
-        setError((previous) =>
-          previous
-            ? `${previous} The menu could not be loaded.`
-            : 'Unable to load the menu. Please check your connection.',
-        );
-      } else {
-        setProducts((productsResult.data ?? []) as Product[]);
-      }
+      await refreshProducts();
+      if (cancelled) return;
 
       setLoading(false);
 
       // Reviews are loaded separately so a review-table issue does not
       // prevent customers from browsing the menu.
-      const reviewsResult = await supabase
-        .from('reviews')
-        .select('id, rating, comment, customer_name, created_at')
-        .eq('verified', true)
-        .order('created_at', { ascending: false })
-        .limit(12);
-
-      if (!cancelled && !reviewsResult.error) {
-        setReviews((reviewsResult.data ?? []) as Review[]);
-      }
+      await refreshReviews();
     }
 
     loadShop();
@@ -414,6 +424,20 @@ export default function HomePage() {
           if (payload.new && 'is_open' in payload.new) {
             setShopOpen(Boolean(payload.new.is_open));
           }
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          void refreshProducts();
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reviews' },
+        () => {
+          void refreshReviews();
         },
       )
       .subscribe();
