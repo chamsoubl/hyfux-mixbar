@@ -5,13 +5,11 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
   type FormEvent,
   type ReactNode,
   type SyntheticEvent,
 } from 'react';
-import Script from 'next/script';
 import { supabase } from '../lib/supabase';
 
 type Product = {
@@ -39,28 +37,6 @@ type Review = {
 };
 
 const WHATSAPP_NUMBER = '+213669713608';
-const TURNSTILE_SITE_KEY = '0x4AAAAAAFUKjKB06ecROFVf';
-
-type TurnstileApi = {
-  render: (
-    container: HTMLElement,
-    options: {
-      sitekey: string;
-      theme: 'dark';
-      callback: (token: string) => void;
-      'expired-callback': () => void;
-      'error-callback': () => void;
-    },
-  ) => string;
-  reset: (widgetId?: string) => void;
-  remove: (widgetId: string) => void;
-};
-
-declare global {
-  interface Window {
-    turnstile?: TurnstileApi;
-  }
-}
 
 const fallbackPhotos = [
   'https://images.unsplash.com/photo-1513558161293-cdaf765edfd7?auto=format&fit=crop&w=640&q=72',
@@ -72,20 +48,6 @@ const fallbackPhotos = [
 
 const cash = (price: number) =>
   `${Number(price || 0).toLocaleString('fr-DZ')} DA`;
-
-function normalizePhoneNumber(value: string): string | null {
-  const compact = value.trim().replace(/[\s().-]/g, '');
-
-  if (/^0[567]\d{8}$/.test(compact)) {
-    return `+213${compact.slice(1)}`;
-  }
-
-  if (/^213[567]\d{8}$/.test(compact)) {
-    return `+${compact}`;
-  }
-
-  return /^\+[1-9]\d{7,14}$/.test(compact) ? compact : null;
-}
 
 const whatsappReady = () => !WHATSAPP_NUMBER.includes('X');
 
@@ -362,15 +324,6 @@ export default function HomePage() {
   const [showCart, setShowCart] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [sendingPhoneCode, setSendingPhoneCode] = useState(false);
-  const [verifyingPhone, setVerifyingPhone] = useState(false);
-  const [verificationPhone, setVerificationPhone] = useState('');
-  const [verifiedPhone, setVerifiedPhone] = useState('');
-  const [phoneCode, setPhoneCode] = useState('');
-  const [turnstileReady, setTurnstileReady] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState('');
-  const captchaContainerRef = useRef<HTMLDivElement>(null);
-  const captchaWidgetId = useRef<string | null>(null);
   const [notice, setNotice] = useState('');
   const [trackingCode, setTrackingCode] = useState('');
   const [currentYear, setCurrentYear] = useState<number | null>(null);
@@ -662,82 +615,6 @@ export default function HomePage() {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
-  async function sendPhoneVerificationCode() {
-    const phone = normalizePhoneNumber(customer.contact);
-    if (!phone) {
-      showMessage('Enter a valid mobile number, such as 0555 12 34 56.');
-      return;
-    }
-    if (!turnstileToken) {
-      showMessage('Complete the security check before requesting an SMS code.');
-      return;
-    }
-
-    setSendingPhoneCode(true);
-    try {
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        phone,
-        options: { channel: 'sms', captchaToken: turnstileToken },
-      });
-
-      if (otpError) {
-        showMessage(`Could not send the verification code: ${otpError.message}`);
-        return;
-      }
-
-      setVerificationPhone(phone);
-      setVerifiedPhone('');
-      setPhoneCode('');
-      showMessage('Verification code sent by SMS.');
-    } catch (error) {
-      const message =
-        (error as { message?: string })?.message || 'Please try again.';
-      showMessage(`Could not send the verification code: ${message}`);
-    } finally {
-      setSendingPhoneCode(false);
-      setTurnstileToken('');
-      if (captchaWidgetId.current) {
-        window.turnstile?.reset(captchaWidgetId.current);
-      }
-    }
-  }
-
-  async function verifyPhoneNumber() {
-    const phone = normalizePhoneNumber(customer.contact);
-    if (!phone || verificationPhone !== phone) {
-      showMessage('Send a new verification code for this phone number.');
-      return;
-    }
-    if (!/^\d{6}$/.test(phoneCode)) {
-      showMessage('Enter the 6-digit code from the SMS.');
-      return;
-    }
-
-    setVerifyingPhone(true);
-    try {
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        phone,
-        token: phoneCode,
-        type: 'sms',
-      });
-
-      if (verifyError || !data.user?.phone_confirmed_at) {
-        showMessage(verifyError?.message || 'Phone verification failed.');
-        return;
-      }
-
-      setVerifiedPhone(phone);
-      setPhoneCode('');
-      showMessage('Phone number verified.');
-    } catch (error) {
-      const message =
-        (error as { message?: string })?.message || 'Please try again.';
-      showMessage(`Phone verification failed: ${message}`);
-    } finally {
-      setVerifyingPhone(false);
-    }
-  }
-
   async function submitWebsiteOrder(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -755,7 +632,6 @@ export default function HomePage() {
 
     const block = customer.block.trim();
     const room = customer.location.trim();
-    const phone = normalizePhoneNumber(customer.contact);
 
     if (block && !/^[A-Za-z]$/.test(block)) {
       showMessage('Block must be one letter.');
@@ -764,11 +640,6 @@ export default function HomePage() {
 
     if (!/^[1-9]\d{0,2}$/.test(room) || Number(room) > 600) {
       showMessage('Room must be a number from 1 to 600.');
-      return;
-    }
-
-    if (!phone || verifiedPhone !== phone) {
-      showMessage('Verify your phone number before placing your order.');
       return;
     }
 
@@ -782,7 +653,7 @@ export default function HomePage() {
           p_name: customer.name.trim(),
           p_room: room,
           p_block: block.toUpperCase(),
-          p_contact: phone,
+          p_contact: customer.contact.trim(),
           p_notes: customer.notes.trim(),
           p_items: cart.map((item) => ({
             product_id: item.product.id,
@@ -809,10 +680,6 @@ export default function HomePage() {
         contact: '',
         notes: '',
       });
-      setVerificationPhone('');
-      setVerifiedPhone('');
-      setPhoneCode('');
-
       showMessage('Your order was submitted successfully.');
     } catch (error) {
       console.error('Order submission failed:', error);
@@ -834,30 +701,6 @@ export default function HomePage() {
       : shopOpen === false
         ? 'CLOSED RIGHT NOW'
         : 'CHECKING STATUS';
-
-  useEffect(() => {
-    if (!showCheckout || !turnstileReady || !captchaContainerRef.current) return;
-    if (!window.turnstile || captchaWidgetId.current) return;
-
-    captchaWidgetId.current = window.turnstile.render(
-      captchaContainerRef.current,
-      {
-        sitekey: TURNSTILE_SITE_KEY,
-        theme: 'dark',
-        callback: setTurnstileToken,
-        'expired-callback': () => setTurnstileToken(''),
-        'error-callback': () => setTurnstileToken(''),
-      },
-    );
-
-    return () => {
-      if (captchaWidgetId.current && window.turnstile) {
-        window.turnstile.remove(captchaWidgetId.current);
-        captchaWidgetId.current = null;
-        setTurnstileToken('');
-      }
-    };
-  }, [showCheckout, turnstileReady]);
 
   return (
     <main className="hyfux-page">
@@ -1513,12 +1356,6 @@ export default function HomePage() {
             className="hx-modal"
             aria-label="Complete your order"
           >
-            <Script
-              src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-              strategy="afterInteractive"
-              onReady={() => setTurnstileReady(true)}
-            />
-
             <div className="hx-drawer-head">
               <div>
                 <p className="hx-eyebrow hx-eyebrow-sm">Almost there</p>
@@ -1607,68 +1444,12 @@ export default function HomePage() {
                 type="tel"
                 autoComplete="tel"
                 value={customer.contact}
-                onChange={(event) => {
-                  setCustomer({ ...customer, contact: event.target.value });
-                  setVerificationPhone('');
-                  setVerifiedPhone('');
-                  setPhoneCode('');
-                }}
-                placeholder="0555 12 34 56 or +213..."
+                onChange={(event) =>
+                  setCustomer({ ...customer, contact: event.target.value })
+                }
+                placeholder="Your phone number"
               />
             </label>
-
-            {verifiedPhone === normalizePhoneNumber(customer.contact) ? (
-              <p className="hx-fineprint" role="status">
-                Phone number verified.
-              </p>
-            ) : (
-              <div className="hx-cart-actions" style={{ marginTop: 12 }}>
-                <div ref={captchaContainerRef} />
-                {verificationPhone === normalizePhoneNumber(customer.contact) && (
-                  <>
-                    <label className="hx-field-label">
-                      SMS verification code
-                      <input
-                        className="hx-field"
-                        required
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        pattern="[0-9]{6}"
-                        maxLength={6}
-                        value={phoneCode}
-                        onChange={(event) =>
-                          setPhoneCode(
-                            event.target.value.replace(/\D/g, '').slice(0, 6),
-                          )
-                        }
-                        placeholder="6-digit code"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="hx-btn hx-btn-sm hx-btn-outline hx-btn-block"
-                      disabled={verifyingPhone || phoneCode.length !== 6}
-                      onClick={verifyPhoneNumber}
-                    >
-                      {verifyingPhone ? 'Verifying...' : 'Verify phone'}
-                    </button>
-                  </>
-                )}
-                <button
-                  type="button"
-                  className="hx-btn hx-btn-sm hx-btn-outline hx-btn-block"
-                  disabled={sendingPhoneCode || verifyingPhone || !turnstileToken}
-                  onClick={sendPhoneVerificationCode}
-                >
-                  {sendingPhoneCode
-                    ? 'Sending code...'
-                    : verificationPhone === normalizePhoneNumber(customer.contact)
-                      ? 'Resend SMS code'
-                      : 'Send SMS verification code'}
-                </button>
-              </div>
-            )}
 
             <label className="hx-field-label">
               Notes (optional)
@@ -1690,8 +1471,7 @@ export default function HomePage() {
                 disabled={
                   submitting ||
                   shopOpen !== true ||
-                  cart.length === 0 ||
-                  verifiedPhone !== normalizePhoneNumber(customer.contact)
+                  cart.length === 0
                 }
               >
                 {submitting ? 'Submitting order...' : 'Place order'}
