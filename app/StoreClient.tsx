@@ -21,6 +21,7 @@ type Product = {
   category: string | null;
   available: boolean;
   sold_out?: boolean | null;
+  featured?: boolean | null;
 };
 
 type CartItem = {
@@ -346,7 +347,7 @@ export default function HomePage() {
       const { data, error: productsError } = await supabase
         .from('products')
         .select(
-          'id, name, description, price, image_url, category, available, sold_out',
+          'id, name, description, price, image_url, category, available, sold_out, featured',
         )
         .eq('available', true)
         .order('name');
@@ -926,7 +927,15 @@ export default function HomePage() {
                 </div>
 
                 <div className="hx-product-content">
-                  <h3>{product.name}</h3>
+                  <div className="hx-product-title-row">
+                    <h3>{product.name}</h3>
+                    {product.featured && (
+                      <span className="hx-product-featured">Featured</span>
+                    )}
+                    {product.sold_out && (
+                      <span className="hx-product-sold-out">Sold out</span>
+                    )}
+                  </div>
 
                   <p className="hx-product-description">
                     {product.description ||
