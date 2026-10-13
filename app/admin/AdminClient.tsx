@@ -2937,6 +2937,7 @@ export default function AdminPage() {
 
   /* ---------- Settings ---------- */
   async function saveSettings(patch: Partial<Settings>) {
+    const openingShop = patch.is_open === true && settings.is_open !== true;
     const { error } = await supabase
       .from(T_SETTINGS)
       .update({ ...patch, updated_at: new Date().toISOString() })
@@ -2946,6 +2947,20 @@ export default function AdminPage() {
       return false;
     }
     setSettings((s) => ({ ...s, ...patch }));
+
+    if (openingShop) {
+      const { data, error: pushError } = await supabase.functions.invoke(
+        "shop-open-push",
+        { body: { action: "notify-open" } }
+      );
+      if (pushError || data?.error) {
+        setNotice("Shop is open, but customer notifications could not be sent. Check push setup.");
+        return true;
+      }
+      setNotice(`Shop is now open. Sent notifications to ${Number(data?.sent) || 0} customer device(s).`);
+      return true;
+    }
+
     setNotice(
       "is_open" in patch && Object.keys(patch).length === 1
         ? patch.is_open

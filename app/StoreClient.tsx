@@ -52,6 +52,12 @@ const cash = (price: number) =>
 
 const whatsappReady = () => !WHATSAPP_NUMBER.includes('X');
 
+function decodeVapidPublicKey(value: string): Uint8Array {
+  const padded = value + '='.repeat((4 - (value.length % 4)) % 4);
+  const decoded = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+}
+
 /* ------------------------------------------------------------------ */
 /*  Brand assets                                                       */
 /*  Drop your own images into /public with these names and they are    */
@@ -329,6 +335,9 @@ export default function HomePage() {
   const [trackingCode, setTrackingCode] = useState('');
   const [currentYear, setCurrentYear] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState('home');
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState('');
 
   const [customer, setCustomer] = useState({
     name: '',
@@ -448,6 +457,79 @@ export default function HomePage() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    navigator.serviceWorker
+      .getRegistration('/')
+      .then((registration) => registration?.pushManager.getSubscription())
+      .then((subscription) => setPushSubscribed(Boolean(subscription)))
+      .catch(() => undefined);
+  }, []);
+
+  async function toggleOpenNotifications() {
+    setPushBusy(true);
+    setPushMessage('');
+
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        throw new Error('This browser does not support push notifications.');
+      }
+      if (!('Notification' in window)) {
+        throw new Error('This browser does not support notifications.');
+      }
+
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      const existing = await registration.pushManager.getSubscription();
+
+      if (existing) {
+        const { error } = await supabase.functions.invoke('shop-open-push', {
+          body: { action: 'unsubscribe', endpoint: existing.endpoint },
+        });
+        await existing.unsubscribe();
+        if (error) throw error;
+        setPushSubscribed(false);
+        setPushMessage('Open notifications turned off.');
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        throw new Error('Allow notifications in your browser to get an alert.');
+      }
+
+      const { data: keyData, error: keyError } = await supabase.functions.invoke(
+        'shop-open-push',
+        { body: { action: 'public-key' } },
+      );
+      if (keyError) throw keyError;
+      if (!keyData?.publicKey) {
+        throw new Error('Open notifications are not configured yet.');
+      }
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: decodeVapidPublicKey(keyData.publicKey) as BufferSource,
+      });
+      const { error: saveError } = await supabase.functions.invoke(
+        'shop-open-push',
+        { body: { action: 'subscribe', subscription: subscription.toJSON() } },
+      );
+      if (saveError) {
+        await subscription.unsubscribe();
+        throw saveError;
+      }
+
+      setPushSubscribed(true);
+      setPushMessage('You will get a notification when the shop opens.');
+    } catch (error) {
+      setPushMessage(
+        error instanceof Error ? error.message : 'Could not set up notifications.',
+      );
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   // Highlight the nav link of the section currently on screen.
   useEffect(() => {
@@ -851,6 +933,37 @@ export default function HomePage() {
             <br />
             The menu is still available to browse, but ordering is paused
             until the shop reopens.
+            <div className="hx-open-alert">
+              <button
+                type="button"
+                className="hx-open-alert-button"
+                onClick={toggleOpenNotifications}
+                disabled={pushBusy}
+              >
+                {pushBusy
+                  ? 'Please wait…'
+                  : pushSubscribed
+                    ? 'Turn off open notifications'
+                    : 'Notify me when you open'}
+              </button>
+              {pushMessage && (
+                <small role="status" aria-live="polite">{pushMessage}</small>
+              )}
+            </div>
+          </div>
+        )}
+
+        {shopOpen === true && pushSubscribed && (
+          <div className="hx-open-alert hx-open-alert-manage">
+            <button
+              type="button"
+              className="hx-open-alert-button"
+              onClick={toggleOpenNotifications}
+              disabled={pushBusy}
+            >
+              {pushBusy ? 'Please wait…' : 'Turn off open notifications'}
+            </button>
+            {pushMessage && <small role="status" aria-live="polite">{pushMessage}</small>}
           </div>
         )}
 

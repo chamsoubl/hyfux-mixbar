@@ -630,6 +630,35 @@
           line-height: 1.6;
         }
 
+        .hx-open-alert {
+          display: grid;
+          justify-items: start;
+          gap: 8px;
+          margin-top: 14px;
+        }
+
+        .hx-open-alert-button {
+          padding: 10px 14px;
+          border: 1px solid rgba(0, 240, 230, 0.55);
+          border-radius: 999px;
+          background: rgba(0, 240, 230, 0.1);
+          color: #e9f6f7;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .hx-open-alert-button:disabled {
+          cursor: wait;
+          opacity: 0.65;
+        }
+
+        .hx-open-alert small {
+          color: var(--muted);
+          font-size: 12px;
+        }
+
         .hx-product-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
