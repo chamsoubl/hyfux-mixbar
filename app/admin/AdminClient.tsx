@@ -2272,7 +2272,7 @@ function Inventory({
       )}
 
       {tab === "recipes" && (
-        <Panel title="Drink recipes" sub="Used to estimate how much stock your sales consume.">
+        <Panel title="Drink recipes" sub="Recipe costs update product margins automatically. Ingredient stock is deducted when an order is delivered.">
           <div className="ad-form" style={{ marginBottom: 18 }}>
             <label className="ad-field full">
               <span>Drink</span>
