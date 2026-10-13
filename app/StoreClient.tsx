@@ -388,6 +388,17 @@ export default function HomePage() {
       }
     }
 
+    async function refreshShopStatus() {
+      const { data, error: settingsError } = await supabase
+        .from('business_settings')
+        .select('is_open')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (cancelled || settingsError || !data) return;
+      setShopOpen(Boolean(data.is_open));
+    }
+
     async function loadShop() {
       setLoading(true);
       setError('');
@@ -420,6 +431,12 @@ export default function HomePage() {
     }
 
     loadShop();
+
+    // Keep the customer-facing status current even if the Realtime
+    // subscription is unavailable or the table is not in its publication.
+    const shopStatusTimer = window.setInterval(() => {
+      void refreshShopStatus();
+    }, 3000);
 
     const channel = supabase
       .channel('hyfux-store-status')
@@ -454,6 +471,7 @@ export default function HomePage() {
 
     return () => {
       cancelled = true;
+      window.clearInterval(shopStatusTimer);
       supabase.removeChannel(channel);
     };
   }, []);
