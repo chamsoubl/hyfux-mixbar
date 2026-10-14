@@ -438,6 +438,20 @@ export default function HomePage() {
       void refreshShopStatus();
     }, 3000);
 
+    // Keep sold-out changes visible even when Supabase Realtime is not
+    // enabled for the products table or the connection drops temporarily.
+    const productsTimer = window.setInterval(() => {
+      void refreshProducts();
+    }, 3000);
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshProducts();
+        void refreshShopStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
     const channel = supabase
       .channel('hyfux-store-status')
       .on(
@@ -472,6 +486,8 @@ export default function HomePage() {
     return () => {
       cancelled = true;
       window.clearInterval(shopStatusTimer);
+      window.clearInterval(productsTimer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
       supabase.removeChannel(channel);
     };
   }, []);
