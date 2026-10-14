@@ -360,6 +360,7 @@ export default function HomePage() {
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMessage, setPushMessage] = useState('');
+  const [whatsappTrackingOptIn, setWhatsappTrackingOptIn] = useState(false);
 
   const [customer, setCustomer] = useState({
     name: '',
@@ -397,13 +398,7 @@ export default function HomePage() {
     }
 
     async function refreshReviews() {
-      const { data, error: reviewsError } = await supabase
-        .from('reviews')
-        .select('id, rating, comment, customer_name, created_at')
-        .eq('verified', true)
-        .or('hidden.is.null,hidden.eq.false')
-        .order('created_at', { ascending: false })
-        .limit(12);
+      const { data, error: reviewsError } = await supabase.rpc('get_public_reviews');
 
       if (!cancelled && !reviewsError) {
         setReviews((data ?? []) as Review[]);
@@ -828,6 +823,23 @@ export default function HomePage() {
           ? data
           : data?.tracking_code ?? data?.order_id ?? '';
 
+      let whatsappNotice = '';
+      if (whatsappTrackingOptIn && code) {
+        try {
+          const response = await fetch('/api/whatsapp/order-tracking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderCode: String(code), consent: true }),
+          });
+          const result = (await response.json()) as { sent?: boolean; error?: string };
+          whatsappNotice = result.sent
+            ? ' Tracking details were sent to WhatsApp.'
+            : ' WhatsApp could not send the tracking message; use the tracking link.';
+        } catch {
+          whatsappNotice = ' WhatsApp could not send the tracking message; use the tracking link.';
+        }
+      }
+
       setTrackingCode(String(code));
       setCart([]);
       setShowCheckout(false);
@@ -839,7 +851,8 @@ export default function HomePage() {
         contact: '',
         notes: '',
       });
-      showMessage('Your order was submitted successfully.');
+      setWhatsappTrackingOptIn(false);
+      showMessage(`Your order was submitted successfully.${whatsappNotice}`);
     } catch (error) {
       console.error('Order submission failed:', error);
       const msg =
@@ -1660,6 +1673,16 @@ export default function HomePage() {
                 }
                 placeholder="Ice, sugar, or delivery instructions"
               />
+            </label>
+
+            <label className="hx-field-label" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <input
+                type="checkbox"
+                checked={whatsappTrackingOptIn}
+                onChange={(event) => setWhatsappTrackingOptIn(event.target.checked)}
+                style={{ marginTop: 3 }}
+              />
+              <span>Send my order tracking code to my phone on WhatsApp. I agree to receive this order message.</span>
             </label>
 
             <div className="hx-cart-actions" style={{ marginTop: 22 }}>

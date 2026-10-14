@@ -26,6 +26,11 @@ export default function TrackPage() {
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   const lookup = useCallback(async (value: string, quiet = false) => {
     const c = value.trim().replace('#', '');
@@ -64,6 +69,35 @@ export default function TrackPage() {
   function submit(e: FormEvent) {
     e.preventDefault();
     lookup(code);
+  }
+
+  async function submitReview(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!code.trim() || reviewSubmitted) return;
+
+    setReviewBusy(true);
+    setReviewMessage('');
+    const { error: reviewError } = await supabase.rpc('submit_order_review', {
+      p_code: code.trim(),
+      p_rating: reviewRating,
+      p_comment: reviewComment.trim() || null,
+    });
+    setReviewBusy(false);
+
+    if (reviewError) {
+      const message = reviewError.message.toLowerCase();
+      setReviewMessage(
+        message.includes('already')
+          ? 'A review has already been submitted for this order.'
+          : message.includes('delivered')
+            ? 'You can leave a review after your order is delivered.'
+            : 'We could not submit your review. Please try again.',
+      );
+      return;
+    }
+
+    setReviewSubmitted(true);
+    setReviewMessage('Thanks! Your review was submitted and will appear after it is published.');
   }
 
   const status = result?.status === 'finished' ? 'delivered' : result?.status;
@@ -149,6 +183,50 @@ export default function TrackPage() {
                 Placed {new Date(result.created_at).toLocaleString('fr-DZ')}
               </small>
             </div>
+
+            {['delivered', 'finished'].includes(result.status) && (
+              <form onSubmit={submitReview} style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 18, display: 'grid', gap: 12 }}>
+                <strong style={{ fontSize: 18 }}>How was your order?</strong>
+                {reviewSubmitted ? (
+                  <p role="status" style={{ margin: 0, color: '#00f0e6' }}>{reviewMessage}</p>
+                ) : (
+                  <>
+                    <label style={{ display: 'grid', gap: 7, color: '#b6c7cd', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
+                      Rating
+                      <select
+                        value={reviewRating}
+                        onChange={(event) => setReviewRating(Number(event.target.value))}
+                        style={{ padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.14)', background: '#081a21', color: '#fff', font: 'inherit' }}
+                      >
+                        <option value={5}>5 stars — Excellent</option>
+                        <option value={4}>4 stars — Good</option>
+                        <option value={3}>3 stars — Okay</option>
+                        <option value={2}>2 stars — Poor</option>
+                        <option value={1}>1 star — Bad</option>
+                      </select>
+                    </label>
+                    <label style={{ display: 'grid', gap: 7, color: '#b6c7cd', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
+                      Comment (optional)
+                      <textarea
+                        value={reviewComment}
+                        onChange={(event) => setReviewComment(event.target.value)}
+                        maxLength={1000}
+                        rows={3}
+                        style={{ padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff', font: 'inherit', resize: 'vertical' }}
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={reviewBusy}
+                      style={{ padding: '13px 20px', borderRadius: 999, border: 0, background: '#00f0e6', color: '#021012', fontWeight: 800, cursor: reviewBusy ? 'wait' : 'pointer' }}
+                    >
+                      {reviewBusy ? 'Submitting review…' : 'Submit review'}
+                    </button>
+                    {reviewMessage && <p role="alert" style={{ margin: 0, color: '#ffb9a5' }}>{reviewMessage}</p>}
+                  </>
+                )}
+              </form>
+            )}
           </div>
         )}
       </div>

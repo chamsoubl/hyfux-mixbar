@@ -2945,7 +2945,24 @@ export default function AdminPage() {
     if (reason !== undefined) patch.cancel_reason = reason;
     const { error } = await supabase.from(T_ORDERS).update(patch).eq("id", o.id);
     if (error) report(`Could not update order: ${error.message}`);
-    else await loadOrders();
+    else {
+      if (["preparing", "ready", "delivered", "finished", "rejected", "cancelled"].includes(status)) {
+        try {
+          const response = await fetch("/api/whatsapp/order-status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderCode: o.id, status }),
+          });
+          if (!response.ok) {
+            const result = await response.json().catch(() => ({}));
+            report(`Order updated, but WhatsApp status message was not sent: ${result.error || "check WhatsApp setup"}`);
+          }
+        } catch {
+          report("Order updated, but the WhatsApp status message could not be sent.");
+        }
+      }
+      await loadOrders();
+    }
   }
 
   function stopOrder(o: Order, status: "rejected" | "cancelled") {
