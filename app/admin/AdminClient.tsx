@@ -14,6 +14,15 @@ const T_SETTINGS = "business_settings"; // single row with id = 1
 const T_EXPENSES = "expenses";
 const IMAGE_BUCKET = "product-images";
 const DONE_STATUSES = ["delivered", "finished"];
+const WEEK_DAYS = [
+  { value: 0, label: "Sunday" },
+  { value: 1, label: "Monday" },
+  { value: 2, label: "Tuesday" },
+  { value: 3, label: "Wednesday" },
+  { value: 4, label: "Thursday" },
+  { value: 5, label: "Friday" },
+  { value: 6, label: "Saturday" },
+];
 const ORDER_SELECT =
   "*, customers(name, room, block, contact, notes), order_items(id, product_id, product_name, quantity, unit_price, line_total, line_cost)";
 
@@ -111,6 +120,7 @@ type AuditRow = {
 type Settings = {
   id: number;
   is_open: boolean;
+  schedule_enabled: boolean;
   store_name: string;
   logo_url: string | null;
   currency: string;
@@ -119,6 +129,7 @@ type Settings = {
   prep_minutes: number;
   opens_at: string | null;
   closes_at: string | null;
+  closed_days: number[];
   min_order: number;
   fulfillment: string;
   notice: string | null;
@@ -129,6 +140,7 @@ type Settings = {
 const DEFAULT_SETTINGS: Settings = {
   id: 1,
   is_open: true,
+  schedule_enabled: false,
   store_name: "HYFUX MIXBAR",
   logo_url: null,
   currency: "DA",
@@ -137,6 +149,7 @@ const DEFAULT_SETTINGS: Settings = {
   prep_minutes: 15,
   opens_at: null,
   closes_at: null,
+  closed_days: [],
   min_order: 0,
   fulfillment: "delivery",
   notice: null,
@@ -2416,9 +2429,21 @@ function StoreSettings({
             aria-checked={settings.is_open}
             aria-label="Shop open"
             className={settings.is_open ? "ad-switch on" : "ad-switch"}
-            onClick={() => onSave({ is_open: !settings.is_open })}
+            onClick={() => onSave({ is_open: !settings.is_open, schedule_enabled: false })}
           />
         </div>
+        <label className="ad-check" style={{ marginTop: 16 }}>
+          <input
+            type="checkbox"
+            checked={d.schedule_enabled}
+            disabled={!d.opens_at || !d.closes_at}
+            onChange={(e) => set("schedule_enabled", e.target.checked)}
+          />
+          Automatically follow these opening hours
+        </label>
+        <small style={{ display: "block", marginTop: 8, opacity: 0.72 }}>
+          Set and save both opening times first. Saving this option lets the shop open and close each day using those hours. Manually changing the shop switch turns the schedule off.
+        </small>
       </Panel>
 
       <Panel title="Store details" sub="Orders are refused outside business hours, below the minimum, and while the shop is closed.">
@@ -2455,6 +2480,27 @@ function StoreSettings({
             <span>Closes at</span>
             <input className="ad-input" type="time" value={time(d.closes_at)} onChange={(e) => set("closes_at", e.target.value || null)} />
           </label>
+          <div className="ad-field full">
+            <span>Closed days</span>
+            <div className="ad-toggles">
+              {WEEK_DAYS.map((day) => (
+                <label className="ad-check" key={day.value}>
+                  <input
+                    type="checkbox"
+                    checked={d.closed_days.includes(day.value)}
+                    onChange={(e) => set(
+                      "closed_days",
+                      e.target.checked
+                        ? [...d.closed_days, day.value].sort((a, b) => a - b)
+                        : d.closed_days.filter((value) => value !== day.value),
+                    )}
+                  />
+                  {day.label}
+                </label>
+              ))}
+            </div>
+            <small>Choose the days the shop is closed. Leave all unchecked to open every day.</small>
+          </div>
           <label className="ad-field">
             <span>Minimum order (DA)</span>
             <input className="ad-input" type="number" min="0" step="any" value={d.min_order} onChange={(e) => set("min_order", Number(e.target.value) || 0)} />
@@ -2976,7 +3022,8 @@ export default function AdminPage() {
     return true;
   }
 
-  const toggleShop = () => saveSettings({ is_open: !settings.is_open });
+  const toggleShop = () =>
+    saveSettings({ is_open: !settings.is_open, schedule_enabled: false });
 
   /* ---------- Derived numbers ---------- */
   const todaysOrders = orders.filter((o) => isToday(o.created_at));

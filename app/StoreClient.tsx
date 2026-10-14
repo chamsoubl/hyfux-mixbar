@@ -37,6 +37,16 @@ type Review = {
   created_at: string;
 };
 
+type StoreHours = {
+  opens_at: string | null;
+  closes_at: string | null;
+  closed_days: number[];
+};
+
+const displayStoreTime = (value: string | null) =>
+  value ? value.slice(0, 5) : null;
+const STORE_WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 const WHATSAPP_NUMBER = '+213669713608';
 
 const fallbackPhotos = [
@@ -254,18 +264,25 @@ function Logo() {
 
 /* Full-width bar at the very top: tells the customer at a glance
    whether they can order right now. */
-function StatusBar({ shopOpen }: { shopOpen: boolean | null }) {
+function StatusBar({ shopOpen, hours }: { shopOpen: boolean | null; hours: StoreHours }) {
   const state =
     shopOpen === true ? 'open' : shopOpen === false ? 'closed' : 'unknown';
+
+  const daysCopy = hours.closed_days.length
+    ? `Closed: ${hours.closed_days.map((day) => STORE_WEEK_DAYS[day]).join(', ')}.`
+    : 'Open every day.';
+  const schedule = hours.opens_at && hours.closes_at
+    ? `Usual hours: ${displayStoreTime(hours.opens_at)}–${displayStoreTime(hours.closes_at)} (Algeria time). ${daysCopy}`
+    : '';
 
   const copy = {
     open: {
       title: "WE'RE OPEN",
-      sub: 'Orders are being accepted right now.',
+      sub: schedule ? `Orders are being accepted now. ${schedule}` : 'Orders are being accepted right now.',
     },
     closed: {
       title: "WE'RE CLOSED",
-      sub: 'You can browse the menu, but ordering is paused until we reopen.',
+      sub: schedule ? `You can browse the menu, but ordering is paused. ${schedule}` : 'You can browse the menu, but ordering is paused until we reopen.',
     },
     unknown: {
       title: 'CHECKING STATUS...',
@@ -324,6 +341,11 @@ export default function HomePage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [shopOpen, setShopOpen] = useState<boolean | null>(null);
+  const [shopHours, setShopHours] = useState<StoreHours>({
+    opens_at: null,
+    closes_at: null,
+    closed_days: [],
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -391,12 +413,17 @@ export default function HomePage() {
     async function refreshShopStatus() {
       const { data, error: settingsError } = await supabase
         .from('business_settings')
-        .select('is_open')
+        .select('is_open, opens_at, closes_at, closed_days')
         .eq('id', 1)
         .maybeSingle();
 
       if (cancelled || settingsError || !data) return;
       setShopOpen(Boolean(data.is_open));
+      setShopHours({
+        opens_at: data.opens_at ?? null,
+        closes_at: data.closes_at ?? null,
+        closed_days: Array.isArray(data.closed_days) ? data.closed_days.map(Number) : [],
+      });
     }
 
     async function loadShop() {
@@ -405,7 +432,7 @@ export default function HomePage() {
 
       const settingsResult = await supabase
         .from('business_settings')
-        .select('is_open')
+        .select('is_open, opens_at, closes_at, closed_days')
         .eq('id', 1)
         .maybeSingle();
 
@@ -418,6 +445,13 @@ export default function HomePage() {
         );
       } else {
         setShopOpen(Boolean(settingsResult.data.is_open));
+        setShopHours({
+          opens_at: settingsResult.data.opens_at ?? null,
+          closes_at: settingsResult.data.closes_at ?? null,
+          closed_days: Array.isArray(settingsResult.data.closed_days)
+            ? settingsResult.data.closed_days.map(Number)
+            : [],
+        });
       }
 
       await refreshProducts();
@@ -463,7 +497,15 @@ export default function HomePage() {
         },
         (payload) => {
           if (payload.new && 'is_open' in payload.new) {
-            setShopOpen(Boolean(payload.new.is_open));
+            const settings = payload.new as Record<string, unknown>;
+            setShopOpen(Boolean(settings.is_open));
+            setShopHours({
+              opens_at: typeof settings.opens_at === 'string' ? settings.opens_at : null,
+              closes_at: typeof settings.closes_at === 'string' ? settings.closes_at : null,
+              closed_days: Array.isArray(settings.closed_days)
+                ? settings.closed_days.map(Number)
+                : [],
+            });
           }
         },
       )
@@ -824,7 +866,7 @@ export default function HomePage() {
 
 
       {/* OPEN / CLOSED BAR */}
-      <StatusBar shopOpen={shopOpen} />
+      <StatusBar shopOpen={shopOpen} hours={shopHours} />
 
       {/* HEADER */}
       <header className="hx-header">
