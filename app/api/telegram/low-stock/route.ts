@@ -1,9 +1,12 @@
 type InventoryRow = {
   id?: string;
   name?: string;
+  category?: string | null;
+  supplier?: string | null;
   stock?: number | string;
   unit?: string | null;
   low_stock_threshold?: number | string;
+  cost_per_unit?: number | string;
 };
 
 type DatabaseWebhook = {
@@ -46,7 +49,13 @@ export async function POST(request: Request) {
   const item = event.record;
   const stock = Number(item.stock);
   const threshold = Number(item.low_stock_threshold);
-  if (!item.name || !Number.isFinite(stock) || !Number.isFinite(threshold)) {
+  const costPerUnit = Number(item.cost_per_unit ?? 0);
+  if (
+    !item.name ||
+    !Number.isFinite(stock) ||
+    !Number.isFinite(threshold) ||
+    !Number.isFinite(costPerUnit)
+  ) {
     return Response.json({ error: 'Inventory row is missing stock fields.' }, { status: 400 });
   }
 
@@ -59,10 +68,17 @@ export async function POST(request: Request) {
   }
 
   const unit = item.unit || 'units';
+  const money = new Intl.NumberFormat('fr-DZ', { maximumFractionDigits: 2 });
   const text = [
-    `LOW STOCK: ${item.name}`,
-    `Remaining: ${stock} ${unit}`,
+    'LOW STOCK ALERT',
+    `Item: ${item.name}`,
+    `Category: ${item.category || 'Not specified'}`,
+    `Supplier: ${item.supplier || 'Not specified'}`,
+    `Current stock: ${stock} ${unit}`,
     `Alert threshold: ${threshold} ${unit}`,
+    `Cost per unit: ${money.format(costPerUnit)} DA`,
+    `Estimated stock value: ${money.format(stock * costPerUnit)} DA`,
+    `Item ID: ${item.id || 'Not provided'}`,
   ].join('\n');
 
   try {
