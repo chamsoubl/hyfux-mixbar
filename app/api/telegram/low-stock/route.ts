@@ -70,15 +70,13 @@ export async function POST(request: Request) {
   const unit = item.unit || 'units';
   const money = new Intl.NumberFormat('fr-DZ', { maximumFractionDigits: 2 });
   const text = [
-    'LOW STOCK ALERT',
+    '🚨 SOS — LOW STOCK ALERT 🚨',
     `Item: ${item.name}`,
     `Category: ${item.category || 'Not specified'}`,
     `Supplier: ${item.supplier || 'Not specified'}`,
     `Current stock: ${stock} ${unit}`,
     `Alert threshold: ${threshold} ${unit}`,
     `Cost per unit: ${money.format(costPerUnit)} DA`,
-    `Estimated stock value: ${money.format(stock * costPerUnit)} DA`,
-    `Item ID: ${item.id || 'Not provided'}`,
   ].join('\n');
 
   try {
