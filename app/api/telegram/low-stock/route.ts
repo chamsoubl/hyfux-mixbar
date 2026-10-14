@@ -14,8 +14,6 @@ type DatabaseWebhook = {
   old_record?: InventoryRow | null;
 };
 
-export const runtime = 'nodejs';
-
 export async function POST(request: Request) {
   const expectedSecret = process.env.LOW_STOCK_WEBHOOK_SECRET;
   const receivedSecret = request.headers.get('x-low-stock-secret');
