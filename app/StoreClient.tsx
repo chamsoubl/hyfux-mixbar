@@ -48,6 +48,7 @@ const displayStoreTime = (value: string | null) =>
 const STORE_WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const WHATSAPP_NUMBER = '+213669713608';
+const WHATSAPP_PHONE = WHATSAPP_NUMBER.replace(/\D/g, '');
 
 const fallbackPhotos = [
   'https://images.unsplash.com/photo-1513558161293-cdaf765edfd7?auto=format&fit=crop&w=640&q=72',
@@ -80,7 +81,7 @@ const ABOUT_IMAGE = '/about_drinks.webp';
 const SOCIAL_LINKS = {
   instagram: 'https://instagram.com/chamsou__.bl',
   tiktok: 'https://www.tiktok.com/@chamsou_.bl',
-  whatsapp: `https://wa.me/${WHATSAPP_NUMBER}`,
+  whatsapp: `https://wa.me/${WHATSAPP_PHONE}`,
 };
 
 const navLinks: { id: string; label: string; href?: string }[] = [
@@ -352,9 +353,7 @@ export default function HomePage() {
   const [search, setSearch] = useState('');
   const [showCart, setShowCart] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState('');
-  const [trackingCode, setTrackingCode] = useState('');
   const [currentYear, setCurrentYear] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState('home');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -620,12 +619,12 @@ export default function HomePage() {
     return () => observer.disconnect();
   }, []);
 
-  // Auto-dismiss short notifications (order confirmations stay visible).
+  // Auto-dismiss short notifications.
   useEffect(() => {
-    if (!notice || trackingCode) return;
+    if (!notice) return;
     const timer = setTimeout(() => setNotice(''), 4500);
     return () => clearTimeout(timer);
-  }, [notice, trackingCode]);
+  }, [notice]);
 
   // Category tabs are built from the products themselves, so adding a new
   // category in the database (e.g. "Desserts") makes a new tab appear.
@@ -751,8 +750,20 @@ export default function HomePage() {
     ].join('\n');
   }
 
-  function orderOnWhatsApp() {
+  function submitWhatsAppOrder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (shopOpen !== true || cart.length === 0) return;
+
+    const block = customer.block.trim();
+    const room = customer.location.trim();
+    if (block && !/^[A-Za-z]$/.test(block)) {
+      showMessage('Block must be one letter.');
+      return;
+    }
+    if (!/^[1-9]\d{0,2}$/.test(room) || Number(room) > 600) {
+      showMessage('Room must be a number from 1 to 600.');
+      return;
+    }
 
     if (!whatsappReady()) {
       showMessage(
@@ -761,90 +772,18 @@ export default function HomePage() {
       return;
     }
 
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+    const url = `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(
       buildWhatsAppMessage(),
     )}`;
 
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
-
-  async function submitWebsiteOrder(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-
-    if (shopOpen !== true) {
-      showMessage('The shop is closed or its status is unavailable.');
-      return;
-    }
-
-    if (cart.length === 0) {
-      showMessage('Your cart is empty.');
-      return;
-    }
-
-    const block = customer.block.trim();
-    const room = customer.location.trim();
-
-    if (block && !/^[A-Za-z]$/.test(block)) {
-      showMessage('Block must be one letter.');
-      return;
-    }
-
-    if (!/^[1-9]\d{0,2}$/.test(room) || Number(room) > 600) {
-      showMessage('Room must be a number from 1 to 600.');
-      return;
-    }
-
-    setSubmitting(true);
-    setNotice('');
-
-    try {
-      const { data, error: orderError } = await supabase.rpc(
-        'place_order',
-        {
-          p_name: customer.name.trim(),
-          p_room: room,
-          p_block: block.toUpperCase(),
-          p_contact: customer.contact.trim(),
-          p_notes: customer.notes.trim(),
-          p_items: cart.map((item) => ({
-            product_id: item.product.id,
-            quantity: item.quantity,
-          })),
-        },
-      );
-
-      if (orderError) throw orderError;
-
-      const code =
-        typeof data === 'string'
-          ? data
-          : data?.tracking_code ?? data?.order_id ?? '';
-
-      setTrackingCode(String(code));
-      setCart([]);
+    const opened = window.open(url, '_blank');
+    if (opened) {
+      opened.opener = null;
       setShowCheckout(false);
       setShowCart(false);
-      setCustomer({
-        name: '',
-        block: '',
-        location: '',
-        contact: '',
-        notes: '',
-      });
-      showMessage('Your order was submitted successfully.');
-    } catch (error) {
-      console.error('Order submission failed:', error);
-      const msg =
-        (error as { message?: string })?.message || 'Unknown error';
-      showMessage(`Order failed: ${msg}`);
-      supabase.rpc('log_client_error', {
-        p_source: 'checkout',
-        p_message: msg,
-      });
-    } finally {
-      setSubmitting(false);
+      showMessage('WhatsApp opened with your order. Tap Send in WhatsApp to place it; the shop will confirm it there.');
+    } else {
+      showMessage('Your browser blocked the WhatsApp window. Allow pop-ups and try again.');
     }
   }
 
@@ -1353,21 +1292,13 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* TOAST / ORDER CONFIRMATION */}
+      {/* TOAST */}
       {notice && (
         <div role="status" className="hx-toast">
           <span>{notice}</span>
-          {trackingCode && (
-            <a href={`/track?code=${encodeURIComponent(trackingCode)}`}>
-              Track order →
-            </a>
-          )}
           <button
             type="button"
-            onClick={() => {
-              setNotice('');
-              setTrackingCode('');
-            }}
+            onClick={() => setNotice('')}
             aria-label="Dismiss notification"
           >
             <CloseIcon size={16} />
@@ -1504,21 +1435,9 @@ export default function HomePage() {
                     type="button"
                     className="hx-btn hx-btn-sm hx-btn-block"
                     disabled={shopOpen !== true}
-                    onClick={() => {
-                      setShowCart(false);
-                      setShowCheckout(true);
-                    }}
+                    onClick={() => setShowCheckout(true)}
                   >
-                    Checkout
-                  </button>
-
-                  <button
-                    type="button"
-                    className="hx-btn hx-btn-sm hx-btn-whatsapp hx-btn-block"
-                    disabled={shopOpen !== true}
-                    onClick={orderOnWhatsApp}
-                  >
-                    Order through WhatsApp
+                    Checkout via WhatsApp
                   </button>
 
                   <button
@@ -1530,21 +1449,18 @@ export default function HomePage() {
                   </button>
                 </div>
 
-                <p className="hx-fineprint">
-                  WhatsApp opens a prepared message for you to review and
-                  send. Your order is not confirmed until the shop replies.
-                </p>
+                <p className="hx-fineprint">Your order is sent to the shop in WhatsApp. It is confirmed when the shop replies.</p>
               </div>
             )}
           </aside>
         </div>
       )}
 
-      {/* WEBSITE CHECKOUT */}
+      {/* WHATSAPP CHECKOUT */}
       {showCheckout && (
         <div className="hx-overlay hx-modal-overlay">
           <form
-            onSubmit={submitWebsiteOrder}
+            onSubmit={submitWhatsAppOrder}
             className="hx-modal"
             aria-label="Complete your order"
           >
@@ -1552,7 +1468,7 @@ export default function HomePage() {
               <div>
                 <p className="hx-eyebrow hx-eyebrow-sm">Almost there</p>
                 <h2 className="hx-drawer-title" style={{ marginTop: 8, fontSize: 21 }}>
-                  Complete your order
+                  Order through WhatsApp
                 </h2>
               </div>
 
@@ -1659,23 +1575,10 @@ export default function HomePage() {
             <div className="hx-cart-actions" style={{ marginTop: 22 }}>
               <button
                 type="submit"
-                className="hx-btn hx-btn-block"
-                disabled={
-                  submitting ||
-                  shopOpen !== true ||
-                  cart.length === 0
-                }
-              >
-                {submitting ? 'Submitting order...' : 'Place order'}
-              </button>
-
-              <button
-                type="button"
                 className="hx-btn hx-btn-whatsapp hx-btn-block"
-                disabled={submitting || shopOpen !== true || cart.length === 0}
-                onClick={orderOnWhatsApp}
+                disabled={shopOpen !== true || cart.length === 0}
               >
-                Or order through WhatsApp
+                Continue to WhatsApp
               </button>
             </div>
           </form>
