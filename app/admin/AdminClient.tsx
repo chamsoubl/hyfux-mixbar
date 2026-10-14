@@ -25,6 +25,8 @@ type Product = {
   cost?: number | null;
   available?: boolean;
   sold_out?: boolean | null;
+  manual_sold_out?: boolean | null;
+  ingredient_sold_out?: boolean | null;
   featured?: boolean | null;
   category?: string | null;
   description?: string | null;
@@ -151,7 +153,8 @@ type ProductForm = {
   description: string;
   image_url: string;
   available: boolean;
-  sold_out: boolean;
+  manual_sold_out: boolean;
+  ingredient_sold_out: boolean;
   featured: boolean;
 };
 
@@ -163,7 +166,8 @@ const EMPTY_FORM: ProductForm = {
   description: "",
   image_url: "",
   available: true,
-  sold_out: false,
+  manual_sold_out: false,
+  ingredient_sold_out: false,
   featured: false,
 };
 
@@ -2810,7 +2814,8 @@ export default function AdminPage() {
       description: p.description ?? "",
       image_url: p.image_url ?? "",
       available: p.available !== false,
-      sold_out: !!p.sold_out,
+      manual_sold_out: !!p.manual_sold_out,
+      ingredient_sold_out: !!p.ingredient_sold_out,
       featured: !!p.featured,
     });
     setNotice("");
@@ -2849,7 +2854,7 @@ export default function AdminPage() {
       description: form.description.trim() || null,
       image_url: form.image_url.trim() || null,
       available: form.available,
-      sold_out: form.sold_out,
+      manual_sold_out: form.manual_sold_out,
       featured: form.featured,
       updated_at: new Date().toISOString(),
     };
@@ -2868,7 +2873,7 @@ export default function AdminPage() {
     setSaving(false);
   }
 
-  async function toggleProduct(p: Product, field: "available" | "sold_out" | "featured") {
+  async function toggleProduct(p: Product, field: "available" | "manual_sold_out" | "featured") {
     const current = field === "available" ? p.available !== false : !!p[field];
     const { error } = await supabase
       .from(T_PRODUCTS)
@@ -3337,6 +3342,7 @@ export default function AdminPage() {
                         {product.name}
                         {product.available === false && <span className="ad-hidden-tag">HIDDEN</span>}
                         {product.sold_out && <span className="ad-hidden-tag">SOLD OUT</span>}
+                        {product.ingredient_sold_out && <span className="ad-hidden-tag">INGREDIENTS LOW</span>}
                       </strong>
                       <small>{product.category || "No category"}</small>
                     </div>
@@ -3414,7 +3420,8 @@ export default function AdminPage() {
                       <div className="ad-product-info">
                         <strong>
                           {form.name || "Drink name"}
-                          {form.sold_out && <span className="ad-hidden-tag">SOLD OUT</span>}
+                          {(form.manual_sold_out || form.ingredient_sold_out) && <span className="ad-hidden-tag">SOLD OUT</span>}
+                          {form.ingredient_sold_out && <span className="ad-hidden-tag">INGREDIENTS LOW</span>}
                           {form.featured && <span className="ad-hidden-tag ok">FEATURED</span>}
                         </strong>
                         <small>{form.description || form.category || "No description"}</small>
@@ -3431,9 +3438,10 @@ export default function AdminPage() {
                         Visible to customers
                       </label>
                       <label className="ad-check">
-                        <input type="checkbox" checked={form.sold_out} onChange={(e) => setForm({ ...form, sold_out: e.target.checked })} />
-                        Sold out
+                        <input type="checkbox" checked={form.manual_sold_out} onChange={(e) => setForm({ ...form, manual_sold_out: e.target.checked })} />
+                        Manually mark sold out
                       </label>
+                      <small>A drink is also marked sold out automatically when any recipe ingredient is insufficient.</small>
                       <label className="ad-check">
                         <input type="checkbox" checked={form.featured} onChange={(e) => setForm({ ...form, featured: e.target.checked })} />
                         Featured special
@@ -3480,6 +3488,7 @@ export default function AdminPage() {
                           {p.name}
                           {p.available === false && <span className="ad-hidden-tag">HIDDEN</span>}
                           {p.sold_out && <span className="ad-hidden-tag">SOLD OUT</span>}
+                          {p.ingredient_sold_out && <span className="ad-hidden-tag">INGREDIENTS LOW</span>}
                           {p.featured && <span className="ad-hidden-tag ok">FEATURED</span>}
                         </strong>
                         <small>
@@ -3491,8 +3500,8 @@ export default function AdminPage() {
                         <button type="button" className="ad-link-btn" onClick={() => toggleProduct(p, "available")}>
                           {p.available === false ? "Show" : "Hide"}
                         </button>
-                        <button type="button" className="ad-link-btn" onClick={() => toggleProduct(p, "sold_out")}>
-                          {p.sold_out ? "In stock" : "Sold out"}
+                        <button type="button" className="ad-link-btn" onClick={() => toggleProduct(p, "manual_sold_out")}>
+                          {p.manual_sold_out ? "Clear manual sold out" : "Mark sold out manually"}
                         </button>
                         <button type="button" className="ad-link-btn" onClick={() => toggleProduct(p, "featured")}>
                           {p.featured ? "Unfeature" : "Feature"}
