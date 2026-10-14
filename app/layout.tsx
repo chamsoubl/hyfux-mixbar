@@ -19,6 +19,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "HYFUX MIXBAR",
   description: "Fresh non-alcoholic mixes, delivered to your room.",
+  other: {
+    "google-adsense-account": "ca-pub-9123130887720244",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
