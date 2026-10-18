@@ -556,6 +556,17 @@ h1, h2, h3, p { margin: 0; }
   font-size: 9px;
   letter-spacing: 0.08em;
 }
+.ad-menu-low-count {
+  margin-left: 6px;
+  margin-right: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 240, 230, 0.1);
+  border: 1px solid rgba(0, 240, 230, 0.4);
+  color: var(--teal);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
 
 .ad-nav-item {
   display: flex;
@@ -591,6 +602,11 @@ h1, h2, h3, p { margin: 0; }
   color: #ff8a5c;
   font-size: 8px;
   letter-spacing: 0.12em;
+}
+.ad-nav-tag.low {
+  background: rgba(0, 240, 230, 0.1);
+  border-color: rgba(0, 240, 230, 0.4);
+  color: var(--teal);
 }
 
 .ad-sidebar-bottom {
@@ -2875,6 +2891,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [lowStockCount, setLowStockCount] = useState(0);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -2963,6 +2980,19 @@ export default function AdminPage() {
     else setOrders((data ?? []) as unknown as Order[]);
   }, [report]);
 
+  const loadLowStockCount = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .select("stock, low_stock_threshold");
+    if (!error) {
+      setLowStockCount(
+        (data ?? []).filter(
+          (item) => Number(item.stock) <= Number(item.low_stock_threshold)
+        ).length
+      );
+    }
+  }, []);
+
   const loadReviews = useCallback(async () => {
     const { data, error } = await supabase
       .from(T_REVIEWS)
@@ -2998,7 +3028,7 @@ export default function AdminPage() {
       setLoading(true);
       try {
         const ok = await loadProducts();
-        await Promise.all([loadOrders(), loadReviews(), loadExpenses(), loadSettings()]);
+        await Promise.all([loadOrders(), loadReviews(), loadExpenses(), loadSettings(), loadLowStockCount()]);
         if (alive) setConnected(ok);
       } catch {
         if (alive) report("Could not connect to Supabase.");
@@ -3017,6 +3047,7 @@ export default function AdminPage() {
         if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
           notifyLowStock(payload.new as Partial<InvItem>);
         }
+        loadLowStockCount();
       })
       .subscribe();
 
@@ -3024,7 +3055,7 @@ export default function AdminPage() {
       alive = false;
       supabase.removeChannel(channel);
     };
-  }, [session, loadProducts, loadOrders, loadReviews, loadExpenses, loadSettings, report]);
+  }, [session, loadProducts, loadOrders, loadReviews, loadExpenses, loadSettings, loadLowStockCount, report]);
 
   /* ---------- Products ---------- */
   function openNewProduct() {
@@ -3393,6 +3424,7 @@ export default function AdminPage() {
         <button type="button" className="ad-menu-btn" aria-expanded={navOpen} onClick={() => setNavOpen((v) => !v)}>
           <span>{section}</span>
           {waiting > 0 && <span className="ad-menu-order-count" aria-label={`${waiting} new orders`}>{waiting} NEW</span>}
+          {lowStockCount > 0 && <span className="ad-menu-low-count" aria-label={`${lowStockCount} low stock items`}>{lowStockCount} LOW</span>}
           <span>{navOpen ? "▲" : "▼"}</span>
         </button>
 
@@ -3418,6 +3450,9 @@ export default function AdminPage() {
               {item.name}
               {item.name === "Orders" && (
                 <span className="ad-nav-tag">{waiting > 0 ? `${waiting} NEW` : "LIVE"}</span>
+              )}
+              {item.name === "Inventory" && lowStockCount > 0 && (
+                <span className="ad-nav-tag low">{lowStockCount} LOW STOCK</span>
               )}
             </button>
           ))}
