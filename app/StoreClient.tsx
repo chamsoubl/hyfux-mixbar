@@ -89,10 +89,10 @@ const SOCIAL_LINKS = {
 const navLinks: { id: string; label: string; href?: string }[] = [
   { id: 'home', label: 'Home' },
   { id: 'menu', label: 'Menu' },
-  { id: 'about', label: 'About' },
+  { id: 'track', label: 'Track Order', href: '/track' },
   { id: 'reviews', label: 'Reviews' },
   { id: 'contact', label: 'Contact' },
-  { id: 'track', label: 'Track Order', href: '/track' },
+  { id: 'about', label: 'About' },
 ];
 
 function imageFallback(fallback: string) {
@@ -1474,11 +1474,11 @@ export default function HomePage() {
             <Logo />
 
             <nav className="hx-footer-links" aria-label="Footer navigation">
-              <a href="#home">Home</a>
-              <a href="#menu">Menu</a>
-              <a href="#about">About</a>
-              <a href="#reviews">Reviews</a>
-              <a href="/track">Track order</a>
+              {navLinks.map((link) => (
+                <a key={link.id} href={link.href ?? `#${link.id}`}>
+                  {link.label}
+                </a>
+              ))}
             </nav>
 
             <div className="hx-social">
