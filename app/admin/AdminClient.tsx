@@ -2041,6 +2041,9 @@ function Inventory({
   const [recipeProduct, setRecipeProduct] = useState("");
   const [recipeItem, setRecipeItem] = useState("");
   const [recipeQty, setRecipeQty] = useState("");
+  const [stockSearch, setStockSearch] = useState("");
+  const [stockCategory, setStockCategory] = useState("all");
+  const [stockLevel, setStockLevel] = useState("all");
 
   const load = useCallback(async () => {
     const [a, b, c] = await Promise.all([
@@ -2077,6 +2080,23 @@ function Inventory({
   }, [orders, recipes]);
 
   const low = items.filter((i) => Number(i.stock) <= Number(i.low_stock_threshold));
+
+  const invCategories = Array.from(
+    new Set(items.map((i) => i.category).filter((c): c is string => !!c))
+  ).sort((a, b) => a.localeCompare(b));
+
+  const shownItems = items.filter((i) => {
+    const q = stockSearch.trim().toLowerCase();
+    if (q && !`${i.name} ${i.category ?? ""} ${i.supplier ?? ""}`.toLowerCase().includes(q)) return false;
+    if (stockCategory !== "all" && (i.category ?? "") !== stockCategory) return false;
+    const stock = Number(i.stock);
+    const isLowItem = stock <= Number(i.low_stock_threshold);
+    if (stockLevel === "low") return isLowItem;
+    if (stockLevel === "out") return stock <= 0;
+    if (stockLevel === "ok") return !isLowItem;
+    return true;
+  });
+  const stockFiltersOn = stockSearch.trim() !== "" || stockCategory !== "all" || stockLevel !== "all";
 
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
@@ -2243,14 +2263,43 @@ function Inventory({
             </form>
           )}
 
+          {items.length > 0 && (
+            <div className="ad-toolbar">
+              <input className="ad-input" placeholder="Search name, category or supplier" value={stockSearch} onChange={(e) => setStockSearch(e.target.value)} />
+              <select className="ad-input" style={{ maxWidth: 190 }} aria-label="Filter by category" value={stockCategory} onChange={(e) => setStockCategory(e.target.value)}>
+                <option value="all">All categories</option>
+                {invCategories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <select className="ad-input" style={{ maxWidth: 190 }} aria-label="Filter by stock level" value={stockLevel} onChange={(e) => setStockLevel(e.target.value)}>
+                <option value="all">All stock levels</option>
+                <option value="low">Low stock</option>
+                <option value="out">Out of stock</option>
+                <option value="ok">In stock</option>
+              </select>
+              {stockFiltersOn && (
+                <button type="button" className="ad-link-btn" onClick={() => { setStockSearch(""); setStockCategory("all"); setStockLevel("all"); }}>
+                  Clear filters
+                </button>
+              )}
+              <small style={{ color: "var(--muted)" }}>Showing {shownItems.length} of {items.length}</small>
+            </div>
+          )}
+
           {items.length === 0 ? (
             <div className="ad-empty">
               <BoxIcon size={28} />
               <strong>No inventory yet</strong>
               <p>Add your first ingredient with the button above.</p>
             </div>
+          ) : shownItems.length === 0 ? (
+            <div className="ad-empty">
+              <strong>No items match</strong>
+              <p>Try another search or clear the filters.</p>
+            </div>
           ) : (
-            items.map((i) => {
+            shownItems.map((i) => {
               const isLow = Number(i.stock) <= Number(i.low_stock_threshold);
               return (
                 <div className="ad-product-row" key={i.id} style={{ flexWrap: "wrap" }}>
@@ -2714,6 +2763,8 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [productSearch, setProductSearch] = useState("");
+  const [productCategory, setProductCategory] = useState("all");
+  const [productStatus, setProductStatus] = useState("all");
 
   const [orderTab, setOrderTab] = useState("active");
   const [orderSearch, setOrderSearch] = useState("");
@@ -3087,9 +3138,19 @@ export default function AdminPage() {
     new Set(products.map((p) => p.category).filter((c): c is string => !!c))
   );
 
-  const filteredProducts = products.filter((p) =>
-    `${p.name} ${p.category ?? ""}`.toLowerCase().includes(productSearch.trim().toLowerCase())
-  );
+  const filteredProducts = products.filter((p) => {
+    const q = productSearch.trim().toLowerCase();
+    if (q && !`${p.name} ${p.category ?? ""} ${p.description ?? ""}`.toLowerCase().includes(q)) return false;
+    if (productCategory !== "all" && (p.category ?? "").toLowerCase() !== productCategory.toLowerCase()) return false;
+    switch (productStatus) {
+      case "visible": return p.available !== false;
+      case "hidden": return p.available === false;
+      case "soldout": return !!p.sold_out;
+      case "featured": return !!p.featured;
+      default: return true;
+    }
+  });
+  const productFiltersOn = productSearch.trim() !== "" || productCategory !== "all" || productStatus !== "all";
 
   const filteredOrders = orders.filter((o) => {
     const st = o.status ?? "new";
@@ -3517,7 +3578,26 @@ export default function AdminPage() {
                 }
               >
                 <div className="ad-toolbar">
-                  <input className="ad-input" placeholder="Search by name or category" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+                  <input className="ad-input" placeholder="Search name, category or description" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+                  <select className="ad-input" style={{ maxWidth: 190 }} aria-label="Filter by category" value={productCategory} onChange={(e) => setProductCategory(e.target.value)}>
+                    <option value="all">All categories</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <select className="ad-input" style={{ maxWidth: 190 }} aria-label="Filter by status" value={productStatus} onChange={(e) => setProductStatus(e.target.value)}>
+                    <option value="all">All statuses</option>
+                    <option value="visible">Visible</option>
+                    <option value="hidden">Hidden</option>
+                    <option value="soldout">Sold out</option>
+                    <option value="featured">Featured</option>
+                  </select>
+                  {productFiltersOn && (
+                    <button type="button" className="ad-link-btn" onClick={() => { setProductSearch(""); setProductCategory("all"); setProductStatus("all"); }}>
+                      Clear filters
+                    </button>
+                  )}
+                  <small style={{ color: "var(--muted)" }}>Showing {filteredProducts.length} of {products.length}</small>
                 </div>
 
                 {filteredProducts.length === 0 ? (
