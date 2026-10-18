@@ -50,6 +50,7 @@ const STORE_WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
 
 const WHATSAPP_NUMBER = '+213669713608';
 const WHATSAPP_PHONE = WHATSAPP_NUMBER.replace(/\D/g, '');
+const CART_KEY = 'hyfux-cart-v1';
 
 const fallbackPhotos = [
   'https://images.unsplash.com/photo-1513558161293-cdaf765edfd7?auto=format&fit=crop&w=640&q=72',
@@ -375,6 +376,9 @@ export default function HomePage() {
   const [placing, setPlacing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const placingRef = useRef(false);
+  const pendingCart = useRef<{ id: string; quantity: number }[] | null>(null);
+  const cartHydrated = useRef(false);
+  const skipCartPersist = useRef(false);
   const [fulfillmentSetting, setFulfillmentSetting] = useState<'delivery' | 'pickup' | 'both'>('both');
   const [defaultFee, setDefaultFee] = useState(0);
   const [blockFees, setBlockFees] = useState<Record<string, number>>({});
@@ -651,6 +655,99 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [notice]);
 
+  // Read the saved cart when the page opens.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(CART_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed)) {
+        const valid = parsed
+          .filter(
+            (row) =>
+              row &&
+              typeof row.id === 'string' &&
+              Number.isInteger(row.quantity) &&
+              row.quantity > 0,
+          )
+          .map((row) => ({
+            id: row.id as string,
+            quantity: Math.min(50, row.quantity as number),
+          }));
+        if (valid.length > 0) pendingCart.current = valid;
+      }
+    } catch {
+      // Storage unavailable: start with an empty cart.
+    }
+    if (!pendingCart.current) cartHydrated.current = true;
+  }, []);
+
+  // Once the menu has loaded, rebuild the cart from current product data.
+  useEffect(() => {
+    if (cartHydrated.current || loading || products.length === 0) return;
+    const saved = pendingCart.current ?? [];
+    const restored: CartItem[] = [];
+    saved.forEach((row) => {
+      const product = products.find((p) => p.id === row.id);
+      if (product && !product.sold_out) {
+        restored.push({ product, quantity: row.quantity });
+      }
+    });
+    skipCartPersist.current = true;
+    setCart(restored);
+    cartHydrated.current = true;
+    pendingCart.current = null;
+  }, [products, loading]);
+
+  // Keep only IDs and quantities in localStorage.
+  useEffect(() => {
+    if (!cartHydrated.current) return;
+    if (skipCartPersist.current) {
+      skipCartPersist.current = false;
+      return;
+    }
+    try {
+      if (cart.length === 0) {
+        window.localStorage.removeItem(CART_KEY);
+      } else {
+        window.localStorage.setItem(
+          CART_KEY,
+          JSON.stringify(
+            cart.map((item) => ({ id: item.product.id, quantity: item.quantity })),
+          ),
+        );
+      }
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [cart]);
+
+  // Refresh product details and drop products that are no longer available.
+  useEffect(() => {
+    if (!cartHydrated.current) return;
+    setCart((current) => {
+      let changed = false;
+      const next: CartItem[] = [];
+      current.forEach((item) => {
+        const fresh = products.find((p) => p.id === item.product.id);
+        if (!fresh || fresh.sold_out) {
+          changed = true;
+          return;
+        }
+        if (
+          fresh.price !== item.product.price ||
+          fresh.name !== item.product.name ||
+          fresh.image_url !== item.product.image_url
+        ) {
+          changed = true;
+          next.push({ ...item, product: fresh });
+        } else {
+          next.push(item);
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [products]);
+
   // Category tabs are built from the products themselves, so adding a new
   // category in the database (e.g. "Desserts") makes a new tab appear.
   const categories = useMemo(() => {
@@ -897,7 +994,7 @@ export default function HomePage() {
       window.location.href = url;
     }
 
-    if (orderId) setCart([]);
+    setCart([]);
     setShowCheckout(false);
     setShowCart(false);
     setPlacing(false);
