@@ -354,6 +354,7 @@ export default function HomePage() {
   const [showCart, setShowCart] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [notice, setNotice] = useState('');
+  const [placing, setPlacing] = useState(false);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState('home');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -727,7 +728,7 @@ export default function HomePage() {
     );
   }
 
-  function buildWhatsAppMessage() {
+  function buildWhatsAppMessage(orderId?: string | null) {
     const lines = cart.map(
       (item) =>
         `• ${item.product.name} x${item.quantity} - ${cash(
@@ -736,7 +737,9 @@ export default function HomePage() {
     );
 
     return [
-      'Hello HYFUX MIXBAR! I would like to place an order:',
+      orderId
+        ? `Hello HYFUX MIXBAR! Order #${orderId.slice(0, 6).toUpperCase()}:`
+        : 'Hello HYFUX MIXBAR! I would like to place an order:',
       '',
       ...lines,
       '',
@@ -747,12 +750,15 @@ export default function HomePage() {
       `Room: ${customer.location || 'To confirm'}`,
       `Contact: ${customer.contact || 'To confirm'}`,
       `Notes: ${customer.notes || 'None'}`,
+      ...(orderId
+        ? ['', `Track your order: ${window.location.origin}/track?code=${orderId}`]
+        : []),
     ].join('\n');
   }
 
-  function submitWhatsAppOrder(event: FormEvent<HTMLFormElement>) {
+  async function submitWhatsAppOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (shopOpen !== true || cart.length === 0) return;
+    if (shopOpen !== true || cart.length === 0 || placing) return;
 
     const block = customer.block.trim();
     const room = customer.location.trim();
@@ -772,19 +778,59 @@ export default function HomePage() {
       return;
     }
 
+    // Open the window during the user's tap so the browser does not block it.
+    const popup = window.open('', '_blank');
+    setPlacing(true);
+
+    let orderId: string | null = null;
+    try {
+      const { data, error: orderError } = await supabase.rpc('place_order', {
+        p_name: customer.name.trim(),
+        p_room: room,
+        p_contact: customer.contact.trim() || null,
+        p_notes: customer.notes.trim() || null,
+        p_block: block || null,
+        p_items: cart.map((item) => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+        })),
+      });
+
+      if (orderError) {
+        if (orderError.code === 'P0001') {
+          popup?.close();
+          showMessage(orderError.message);
+          setPlacing(false);
+          return;
+        }
+        throw orderError;
+      }
+      orderId = typeof data === 'string' ? data : null;
+    } catch {
+      // Keep the WhatsApp path available if saving fails for a technical reason.
+      orderId = null;
+    }
+
     const url = `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(
-      buildWhatsAppMessage(),
+      buildWhatsAppMessage(orderId),
     )}`;
 
-    const opened = window.open(url, '_blank');
-    if (opened) {
-      opened.opener = null;
-      setShowCheckout(false);
-      setShowCart(false);
-      showMessage('WhatsApp opened with your order. Tap Send in WhatsApp to place it; the shop will confirm it there.');
+    if (popup) {
+      popup.opener = null;
+      popup.location.href = url;
     } else {
-      showMessage('Your browser blocked the WhatsApp window. Allow pop-ups and try again.');
+      window.location.href = url;
     }
+
+    if (orderId) setCart([]);
+    setShowCheckout(false);
+    setShowCart(false);
+    setPlacing(false);
+    showMessage(
+      orderId
+        ? 'Order saved! Tap Send in WhatsApp so the shop can confirm it.'
+        : 'WhatsApp opened with your order. Tap Send to place it.',
+    );
   }
 
   const shopStatus =
@@ -1575,9 +1621,9 @@ export default function HomePage() {
               <button
                 type="submit"
                 className="hx-btn hx-btn-whatsapp hx-btn-block"
-                disabled={shopOpen !== true || cart.length === 0}
+                disabled={shopOpen !== true || cart.length === 0 || placing}
               >
-                Continue to WhatsApp
+                {placing ? 'Placing your order…' : 'Continue to WhatsApp'}
               </button>
             </div>
           </form>
