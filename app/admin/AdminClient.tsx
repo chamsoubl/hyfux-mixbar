@@ -583,13 +583,13 @@ h1, h2, h3, p { margin: 0; }
 .ad-menu-low-count {
   margin-left: 6px;
   margin-right: 10px;
-  padding: 4px 8px;
+  padding: 4px 6px;
   border-radius: 999px;
   background: rgba(0, 240, 230, 0.1);
   border: 1px solid rgba(0, 240, 230, 0.4);
   color: var(--teal);
-  font-size: 9px;
-  letter-spacing: 0.08em;
+  font-size: 8px;
+  letter-spacing: 0.04em;
 }
 
 .ad-nav-item {
@@ -3448,7 +3448,7 @@ export default function AdminPage() {
         <button type="button" className="ad-menu-btn" aria-expanded={navOpen} onClick={() => setNavOpen((v) => !v)}>
           <span>{section}</span>
           {waiting > 0 && <span className="ad-menu-order-count" aria-label={`${waiting} new orders`}>{waiting} NEW</span>}
-          {lowStockCount > 0 && <span className="ad-menu-low-count" aria-label={`${lowStockCount} low stock items`}>{lowStockCount} LOW</span>}
+          {lowStockCount > 0 && <span className="ad-menu-low-count" aria-label={`${lowStockCount} low stock items`}>{lowStockCount} LOW STOCK</span>}
           <span>{navOpen ? "▲" : "▼"}</span>
         </button>
 
