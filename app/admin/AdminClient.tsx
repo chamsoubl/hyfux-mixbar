@@ -72,6 +72,7 @@ type Order = {
 
 type Review = {
   id: string;
+  order_id?: string | null;
   created_at: string;
   rating?: number | null;
   comment?: string | null;
@@ -3037,6 +3038,14 @@ export default function AdminPage() {
     else await loadReviews();
   }
 
+  function reviewRequestLink(o: Order) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    return whatsappLink(
+      o.customers?.contact,
+      `Hello ${o.customers?.name ?? ""}! 🍹 Thank you for ordering from HYFUX MIXBAR. Your order #${shortId(o.id)} was delivered. We'd love to know what you think, it takes 10 seconds: ${origin}/track?code=${o.id}`
+    );
+  }
+
   /* ---------- Settings ---------- */
   async function saveSettings(patch: Partial<Settings>) {
     const openingShop = patch.is_open === true && settings.is_open !== true;
@@ -3761,7 +3770,13 @@ export default function AdminPage() {
                           </>
                         )}
                         {status !== "new" && nextStatus && open && (
-                          <button type="button" className="ad-btn" style={{ padding: "10px 18px" }} onClick={() => setOrderStatus(o, nextStatus)}>
+                          <button type="button" className="ad-btn" style={{ padding: "10px 18px" }} onClick={() => {
+                            if (nextStatus === "delivered") {
+                              const link = reviewRequestLink(o);
+                              if (link) window.open(link, "_blank", "noopener,noreferrer");
+                            }
+                            setOrderStatus(o, nextStatus);
+                          }}>
                             Mark {STATUS_LABEL[nextStatus].toLowerCase()}
                           </button>
                         )}
@@ -3775,6 +3790,16 @@ export default function AdminPage() {
                             Refund
                           </button>
                         )}
+                        {DONE_STATUSES.includes(status) &&
+                          (reviews.some((r) => r.order_id === o.id) ? (
+                            <span className="ad-hidden-tag ok">REVIEWED</span>
+                          ) : (
+                            reviewRequestLink(o) && (
+                              <a className="ad-link-btn" href={reviewRequestLink(o) ?? "#"} target="_blank" rel="noopener noreferrer">
+                                Ask for review
+                              </a>
+                            )
+                          ))}
                         {wa && (
                           <a className="ad-link-btn" href={wa} target="_blank" rel="noopener noreferrer">
                             WhatsApp
