@@ -1227,6 +1227,17 @@ select.ad-input option { background: #07151b; color: #f4f8fa; }
   .ad-tagline { letter-spacing: 0.18em; font-size: 9px; gap: 10px; }
   .ad-form { grid-template-columns: minmax(0, 1fr); }
   .ad-login-wrap { min-height: 100vh; }
+  .ad-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ad-tabs::-webkit-scrollbar { display: none; }
+  .ad-tab, .ad-badge { flex: none; white-space: nowrap; }
+  .ad-nav { scrollbar-width: none; }
+  .ad-nav::-webkit-scrollbar { display: none; }
+  .ad-nav-item { white-space: nowrap; }
 }
 
 @media (prefers-reduced-motion: reduce) {
