@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -1250,7 +1250,6 @@ export default function HomePage() {
               <a href="#about">About</a>
               <a href="#reviews">Reviews</a>
               <a href="/track">Track order</a>
-              <a href="/admin">Admin</a>
             </nav>
 
             <div className="hx-social">
