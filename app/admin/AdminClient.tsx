@@ -545,6 +545,17 @@ h1, h2, h3, p { margin: 0; }
   text-transform: uppercase;
   cursor: pointer;
 }
+.ad-menu-order-count {
+  margin-left: auto;
+  margin-right: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 77, 6, 0.18);
+  border: 1px solid rgba(255, 77, 6, 0.55);
+  color: #ff9b72;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
 
 .ad-nav-item {
   display: flex;
@@ -1251,7 +1262,6 @@ select.ad-input option { background: #07151b; color: #f4f8fa; }
   .ad-nav { display: none; margin-top: 12px; gap: 6px; }
   .ad-nav.open { display: grid; }
   .ad-nav-item { width: 100%; }
-  .ad-nav-tag { display: none; }
   .ad-main { padding: 22px 16px 20px; }
   .ad-status { display: none; }
   .ad-welcome { padding: 26px 22px; min-height: 0; }
@@ -3222,6 +3232,21 @@ export default function AdminPage() {
   const preparing = orders.filter((o) => o.status === "preparing").length;
   const ready = orders.filter((o) => o.status === "ready").length;
 
+  useEffect(() => {
+    document.title = waiting > 0 ? `(${waiting}) HYFUX MIXBAR` : "HYFUX MIXBAR";
+    const badgeNavigator = navigator as Navigator & {
+      setAppBadge?: (count?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    const badgeUpdate = waiting > 0
+      ? badgeNavigator.setAppBadge?.(waiting)
+      : badgeNavigator.clearAppBadge?.();
+    if (badgeUpdate) void badgeUpdate.catch(() => {});
+    return () => {
+      document.title = "HYFUX MIXBAR";
+    };
+  }, [waiting]);
+
   const verifiedReviews = reviews.filter(
     (r) => !r.hidden && DONE_STATUSES.includes(r.orders?.status ?? "")
   );
@@ -3367,6 +3392,7 @@ export default function AdminPage() {
 
         <button type="button" className="ad-menu-btn" aria-expanded={navOpen} onClick={() => setNavOpen((v) => !v)}>
           <span>{section}</span>
+          {waiting > 0 && <span className="ad-menu-order-count" aria-label={`${waiting} new orders`}>{waiting} NEW</span>}
           <span>{navOpen ? "▲" : "▼"}</span>
         </button>
 
