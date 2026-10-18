@@ -5,6 +5,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -355,6 +356,7 @@ export default function HomePage() {
   const [showCheckout, setShowCheckout] = useState(false);
   const [notice, setNotice] = useState('');
   const [placing, setPlacing] = useState(false);
+  const placingRef = useRef(false);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState('home');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -758,7 +760,7 @@ export default function HomePage() {
 
   async function submitWhatsAppOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (shopOpen !== true || cart.length === 0 || placing) return;
+    if (shopOpen !== true || cart.length === 0 || placingRef.current) return;
 
     const block = customer.block.trim();
     const room = customer.location.trim();
@@ -779,6 +781,7 @@ export default function HomePage() {
     }
 
     // Open the window during the user's tap so the browser does not block it.
+    placingRef.current = true;
     const popup = window.open('', '_blank');
     setPlacing(true);
 
@@ -801,6 +804,7 @@ export default function HomePage() {
           popup?.close();
           showMessage(orderError.message);
           setPlacing(false);
+          placingRef.current = false;
           return;
         }
         throw orderError;
@@ -826,6 +830,7 @@ export default function HomePage() {
     setShowCheckout(false);
     setShowCart(false);
     setPlacing(false);
+    placingRef.current = false;
     showMessage(
       orderId
         ? 'Order saved! Tap Send in WhatsApp so the shop can confirm it.'
