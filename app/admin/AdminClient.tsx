@@ -235,6 +235,22 @@ function notifyNewOrder() {
   }
 }
 
+function notifyLowStock(item: Partial<InvItem>) {
+  if (!("Notification" in window) || Notification.permission !== "granted" || !item.id) return;
+  const key = `hyfux-low-stock-notified-${item.id}`;
+  const isLow = Number(item.stock) <= Number(item.low_stock_threshold);
+  if (!isLow) {
+    window.sessionStorage.removeItem(key);
+    return;
+  }
+  if (window.sessionStorage.getItem(key)) return;
+  window.sessionStorage.setItem(key, "1");
+  new Notification("Low stock alert", {
+    body: `${item.name || "An inventory item"}: ${Number(item.stock)} ${item.unit || "units"} left (alert at ${Number(item.low_stock_threshold)}).`,
+    tag: `low-stock-${item.id}`,
+  });
+}
+
 function isToday(iso: string) {
   const d = new Date(iso);
   const n = new Date();
@@ -2986,6 +3002,11 @@ export default function AdminPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: T_ORDERS }, (payload) => {
         loadOrders();
         if (payload.eventType === "INSERT") notifyNewOrder();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "inventory_items" }, (payload) => {
+        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+          notifyLowStock(payload.new as Partial<InvItem>);
+        }
       })
       .subscribe();
 
