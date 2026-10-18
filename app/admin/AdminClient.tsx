@@ -48,6 +48,8 @@ type Order = {
   customer_id?: string | null;
   total?: number | null;
   discount?: number | null;
+  fulfillment?: string | null;
+  delivery_fee?: number | null;
   refund_amount?: number | null;
   status?: string | null;
   notes?: string | null;
@@ -133,6 +135,7 @@ type Settings = {
   closed_days: number[];
   min_order: number;
   fulfillment: string;
+  delivery_fee_default: number;
   notice: string | null;
   banner_text: string | null;
   discount_percent: number;
@@ -153,6 +156,7 @@ const DEFAULT_SETTINGS: Settings = {
   closed_days: [],
   min_order: 0,
   fulfillment: "delivery",
+  delivery_fee_default: 0,
   notice: null,
   banner_text: null,
   discount_percent: 0,
@@ -2441,12 +2445,82 @@ function Inventory({
 /* Store settings                                                          */
 /* ====================================================================== */
 
+function DeliveryFees({ onError }: { onError: (m: string) => void }) {
+  const [rows, setRows] = useState<{ block: string; fee: number }[]>([]);
+  const [block, setBlock] = useState("");
+  const [fee, setFee] = useState("");
+
+  const load = useCallback(async () => {
+    const { data, error } = await supabase.from("delivery_fees").select("block, fee").order("block");
+    if (error) onError(`Delivery fees could not be loaded: ${error.message}`);
+    else setRows((data ?? []) as { block: string; fee: number }[]);
+  }, [onError]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    const b = block.trim().toUpperCase();
+    const f = Number(fee);
+    if (!b || !isFinite(f) || f < 0) {
+      onError("Enter a block letter and a fee of 0 or more.");
+      return;
+    }
+    const { error } = await supabase.from("delivery_fees").upsert({ block: b, fee: f }, { onConflict: "block" });
+    if (error) onError(`Could not save the fee: ${error.message}`);
+    else {
+      setBlock("");
+      setFee("");
+      await load();
+    }
+  }
+
+  async function remove(b: string) {
+    const { error } = await supabase.from("delivery_fees").delete().eq("block", b);
+    if (error) onError(`Could not delete: ${error.message}`);
+    else await load();
+  }
+
+  return (
+    <Panel title="Delivery fee by block" sub="Blocks not listed here use the default fee.">
+      <form className="ad-form" onSubmit={save} style={{ marginBottom: 18 }}>
+        <label className="ad-field">
+          <span>Block</span>
+          <input className="ad-input" maxLength={1} placeholder="A" value={block} onChange={(e) => setBlock(e.target.value.replace(/[^a-z]/gi, "").toUpperCase())} />
+        </label>
+        <label className="ad-field">
+          <span>Fee (DA)</span>
+          <input className="ad-input" type="number" min="0" step="any" value={fee} onChange={(e) => setFee(e.target.value)} />
+        </label>
+        <div className="ad-form-actions">
+          <button className="ad-btn" type="submit">Save fee</button>
+        </div>
+      </form>
+      {rows.length === 0 ? (
+        <div className="ad-empty">No block fees yet. The default fee applies to everyone.</div>
+      ) : (
+        rows.map((r) => (
+          <div className="ad-product-row" key={r.block}>
+            <div className="ad-product-info"><strong>Block {r.block}</strong></div>
+            <span className="ad-price">{cash(Number(r.fee))}</span>
+            <button type="button" className="ad-link-btn danger" onClick={() => remove(r.block)}>Delete</button>
+          </div>
+        ))
+      )}
+    </Panel>
+  );
+}
+
 function StoreSettings({
   settings,
   onSave,
+  onError,
 }: {
   settings: Settings;
   onSave: (patch: Partial<Settings>) => Promise<boolean>;
+  onError: (m: string) => void;
 }) {
   const [d, setD] = useState<Settings>(settings);
   const [saving, setSaving] = useState(false);
@@ -2564,6 +2638,10 @@ function StoreSettings({
             </select>
           </label>
           <label className="ad-field">
+            <span>Default delivery fee (DA)</span>
+            <input className="ad-input" type="number" min="0" step="any" value={d.delivery_fee_default} onChange={(e) => set("delivery_fee_default", Number(e.target.value) || 0)} />
+          </label>
+          <label className="ad-field">
             <span>Discount on every order (%)</span>
             <input className="ad-input" type="number" min="0" max="100" step="any" value={d.discount_percent} onChange={(e) => set("discount_percent", Number(e.target.value) || 0)} />
           </label>
@@ -2582,6 +2660,7 @@ function StoreSettings({
           </div>
         </form>
       </Panel>
+      <DeliveryFees onError={onError} />
     </div>
   );
 }
@@ -3377,7 +3456,9 @@ export default function AdminPage() {
                           #{shortId(o.id)} · {o.customers?.name || "Customer"}
                         </strong>
                         <small>
-                          Block {o.customers?.block || "—"} · Room {o.customers?.room || "—"} · {new Date(o.created_at).toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" })}
+                          {o.fulfillment === "pickup"
+                            ? "Pickup"
+                            : `Block ${o.customers?.block || "—"} · Room ${o.customers?.room || "—"}`} · {new Date(o.created_at).toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" })}
                         </small>
                       </div>
                       <span className={`ad-badge ${o.status ?? "new"}`}>{STATUS_LABEL[o.status ?? "new"] ?? o.status}</span>
@@ -3712,11 +3793,15 @@ export default function AdminPage() {
 
                     <div className="ad-order-meta">
                       <b>{o.customers?.name || "Customer"}</b>
-                      {o.customers?.block ? ` · Block ${o.customers.block}` : ""}
-                      {o.customers?.room ? ` · Room ${o.customers.room}` : ""}
+                      {o.fulfillment !== "pickup" && o.customers?.block ? ` · Block ${o.customers.block}` : ""}
+                      {o.fulfillment !== "pickup" && o.customers?.room ? ` · Room ${o.customers.room}` : ""}
                       {o.customers?.contact ? ` · ${o.customers.contact}` : ""}
                       <br />
                       {new Date(o.created_at).toLocaleString("fr-DZ")}
+                      <br />
+                      {o.fulfillment === "pickup"
+                        ? "🏬 Pickup"
+                        : `🛵 Delivery${Number(o.delivery_fee) > 0 ? ` (+${cash(Number(o.delivery_fee))})` : ""}`}
                       {o.notes ? (
                         <>
                           <br />
@@ -3751,6 +3836,12 @@ export default function AdminPage() {
                           <div>
                             <span>Discount</span>
                             <span>− {cash(Number(o.discount))}</span>
+                          </div>
+                        )}
+                        {Number(o.delivery_fee) > 0 && (
+                          <div>
+                            <span>Delivery fee</span>
+                            <span>+ {cash(Number(o.delivery_fee))}</span>
                           </div>
                         )}
                       </div>
@@ -3826,7 +3917,7 @@ export default function AdminPage() {
 
         {section === "Inventory" && <Inventory orders={orders} products={products} onError={report} />}
 
-        {section === "Store Settings" && <StoreSettings settings={settings} onSave={saveSettings} />}
+        {section === "Store Settings" && <StoreSettings settings={settings} onSave={saveSettings} onError={report} />}
 
         {section === "Security" && (
           <Security session={session} connected={connected} issues={issues} onSignOut={signOut} onError={report} />

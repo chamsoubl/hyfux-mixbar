@@ -357,6 +357,10 @@ export default function HomePage() {
   const [notice, setNotice] = useState('');
   const [placing, setPlacing] = useState(false);
   const placingRef = useRef(false);
+  const [fulfillmentSetting, setFulfillmentSetting] = useState<'delivery' | 'pickup' | 'both'>('both');
+  const [defaultFee, setDefaultFee] = useState(0);
+  const [blockFees, setBlockFees] = useState<Record<string, number>>({});
+  const [mode, setMode] = useState<'delivery' | 'pickup'>('delivery');
   const [currentYear, setCurrentYear] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState('home');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -672,6 +676,45 @@ export default function HomePage() {
     0,
   );
 
+  const effectiveMode: 'delivery' | 'pickup' =
+    fulfillmentSetting === 'pickup' ? 'pickup'
+    : fulfillmentSetting === 'delivery' ? 'delivery'
+    : mode;
+  const deliveryFee =
+    effectiveMode === 'delivery'
+      ? blockFees[customer.block.trim().toUpperCase()] ?? defaultFee
+      : 0;
+  const grandTotal = cartTotal + deliveryFee;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [settingsRes, feesRes] = await Promise.all([
+        supabase.from('business_settings').select('fulfillment, delivery_fee_default').eq('id', 1).maybeSingle(),
+        supabase.from('delivery_fees').select('block, fee'),
+      ]);
+      if (cancelled) return;
+      if (settingsRes.data) {
+        const f = settingsRes.data.fulfillment;
+        setFulfillmentSetting(f === 'pickup' || f === 'delivery' ? f : 'both');
+        setDefaultFee(Number(settingsRes.data.delivery_fee_default) || 0);
+      }
+      if (feesRes.data) {
+        setBlockFees(
+          Object.fromEntries(
+            feesRes.data.map((r: { block: string; fee: number }) => [
+              String(r.block).toUpperCase(),
+              Number(r.fee) || 0,
+            ]),
+          ),
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showCheckout]);
+
   const averageRating =
     reviews.length > 0
       ? reviews.reduce((sum, review) => sum + review.rating, 0) /
@@ -745,11 +788,20 @@ export default function HomePage() {
       '',
       ...lines,
       '',
-      `Total: ${cash(cartTotal)}`,
+      `Items: ${cash(cartTotal)}`,
+      effectiveMode === 'delivery'
+        ? `Delivery fee: ${cash(deliveryFee)}`
+        : 'Pickup: no delivery fee',
+      `Total: ${cash(grandTotal)}`,
       '',
+      `Type: ${effectiveMode === 'delivery' ? 'Delivery' : 'Pickup'}`,
       `Name: ${customer.name || 'To confirm'}`,
-      `Block: ${customer.block || 'To confirm'}`,
-      `Room: ${customer.location || 'To confirm'}`,
+      ...(effectiveMode === 'delivery'
+        ? [
+            `Block: ${customer.block || 'To confirm'}`,
+            `Room: ${customer.location || 'To confirm'}`,
+          ]
+        : []),
       `Contact: ${customer.contact || 'To confirm'}`,
       `Notes: ${customer.notes || 'None'}`,
       ...(orderId
@@ -764,11 +816,11 @@ export default function HomePage() {
 
     const block = customer.block.trim();
     const room = customer.location.trim();
-    if (block && !/^[A-Za-z]$/.test(block)) {
+    if (effectiveMode === 'delivery' && block && !/^[A-Za-z]$/.test(block)) {
       showMessage('Block must be one letter.');
       return;
     }
-    if (!/^[1-9]\d{0,2}$/.test(room) || Number(room) > 600) {
+    if (effectiveMode === 'delivery' && (!/^[1-9]\d{0,2}$/.test(room) || Number(room) > 600)) {
       showMessage('Room must be a number from 1 to 600.');
       return;
     }
@@ -793,6 +845,7 @@ export default function HomePage() {
         p_contact: customer.contact.trim() || null,
         p_notes: customer.notes.trim() || null,
         p_block: block || null,
+        p_fulfillment: effectiveMode,
         p_items: cart.map((item) => ({
           product_id: item.product.id,
           quantity: item.quantity,
@@ -1532,10 +1585,38 @@ export default function HomePage() {
               </button>
             </div>
 
+            {fulfillmentSetting === 'both' ? (
+              <div className="hx-categories" role="group" aria-label="Delivery or pickup" style={{ margin: '14px 0' }}>
+                <button
+                  type="button"
+                  aria-pressed={mode === 'delivery'}
+                  className={`hx-category ${mode === 'delivery' ? 'hx-category-active' : ''}`}
+                  onClick={() => setMode('delivery')}
+                >
+                  Delivery
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={mode === 'pickup'}
+                  className={`hx-category ${mode === 'pickup' ? 'hx-category-active' : ''}`}
+                  onClick={() => setMode('pickup')}
+                >
+                  Pickup
+                </button>
+              </div>
+            ) : (
+              <p className="hx-fineprint" style={{ margin: '14px 0' }}>
+                {effectiveMode === 'delivery' ? 'Delivery to your room' : 'Pickup only'}
+              </p>
+            )}
+
             <p className="hx-modal-total">
+              Drinks: <strong>{cash(cartTotal)}</strong>
+              {effectiveMode === 'delivery' && <> · Delivery: <strong>{cash(deliveryFee)}</strong></>}
+              <br />
               Order total:{' '}
               <strong className="hx-price" style={{ fontSize: 17 }}>
-                {cash(cartTotal)}
+                {cash(grandTotal)}
               </strong>
             </p>
 
@@ -1553,46 +1634,51 @@ export default function HomePage() {
               />
             </label>
 
-            <label className="hx-field-label">
-              Block
-              <input
-                className="hx-field"
-                type="text"
-                autoCapitalize="characters"
-                maxLength={1}
-                pattern="[A-Za-z]"
-                value={customer.block}
-                onChange={(event) => {
-                  const block = event.target.value
-                    .replace(/[^a-z]/gi, '')
-                    .slice(0, 1)
-                    .toUpperCase();
-                  setCustomer({ ...customer, block });
-                }}
-                placeholder="Your block (e.g. A, B, C)"
-              />
-            </label>
+            {effectiveMode === 'delivery' && (
+              <>
+                <label className="hx-field-label">
+                  Block
+                  <input
+                    className="hx-field"
+                    type="text"
+                    required
+                    autoCapitalize="characters"
+                    maxLength={1}
+                    pattern="[A-Za-z]"
+                    value={customer.block}
+                    onChange={(event) => {
+                      const block = event.target.value
+                        .replace(/[^a-z]/gi, '')
+                        .slice(0, 1)
+                        .toUpperCase();
+                      setCustomer({ ...customer, block });
+                    }}
+                    placeholder="Your block (e.g. A, B, C)"
+                  />
+                </label>
 
-            <label className="hx-field-label">
-              Room
-              <input
-                className="hx-field"
-                required
-                type="text"
-                inputMode="numeric"
-                pattern="([1-9]|[1-9][0-9]|[1-5][0-9]{2}|600)"
-                title="Enter a room number from 1 to 600."
-                maxLength={3}
-                value={customer.location}
-                onChange={(event) =>
-                  setCustomer({
-                    ...customer,
-                    location: event.target.value.replace(/\D/g, '').slice(0, 3),
-                  })
-                }
-                placeholder="Your room number"
-              />
-            </label>
+                <label className="hx-field-label">
+                  Room
+                  <input
+                    className="hx-field"
+                    required
+                    type="text"
+                    inputMode="numeric"
+                    pattern="([1-9]|[1-9][0-9]|[1-5][0-9]{2}|600)"
+                    title="Enter a room number from 1 to 600."
+                    maxLength={3}
+                    value={customer.location}
+                    onChange={(event) =>
+                      setCustomer({
+                        ...customer,
+                        location: event.target.value.replace(/\D/g, '').slice(0, 3),
+                      })
+                    }
+                    placeholder="Your room number"
+                  />
+                </label>
+              </>
+            )}
 
             <label className="hx-field-label">
               Phone number
