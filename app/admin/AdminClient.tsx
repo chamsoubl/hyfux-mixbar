@@ -512,6 +512,23 @@ h1, h2, h3, p { margin: 0; }
 }
 
 .ad-nav { display: grid; gap: 8px; }
+.ad-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--teal);
+  background: rgba(0, 240, 230, 0.07);
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
 
 .ad-nav-item {
   display: flex;
@@ -1214,8 +1231,10 @@ select.ad-input option { background: #07151b; color: #f4f8fa; }
     border-bottom: 1px solid rgba(0, 240, 230, 0.16);
   }
   .ad-label, .ad-sidebar-bottom { display: none; }
-  .ad-nav { display: flex; gap: 8px; margin-top: 14px; overflow-x: auto; padding-bottom: 4px; }
-  .ad-nav-item { flex: none; padding: 10px 16px; }
+  .ad-menu-btn { display: flex; }
+  .ad-nav { display: none; margin-top: 12px; gap: 6px; }
+  .ad-nav.open { display: grid; }
+  .ad-nav-item { width: 100%; }
   .ad-nav-tag { display: none; }
   .ad-main { padding: 22px 16px 20px; }
   .ad-status { display: none; }
@@ -2837,6 +2856,7 @@ export default function AdminPage() {
   const [notice, setNotice] = useState("");
   const [issues, setIssues] = useState<string[]>([]);
   const [section, setSection] = useState("Overview");
+  const [navOpen, setNavOpen] = useState(false);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
   const [form, setForm] = useState<ProductForm | null>(null);
@@ -3324,15 +3344,21 @@ export default function AdminPage() {
       <aside className="ad-sidebar">
         <Logo />
 
+        <button type="button" className="ad-menu-btn" aria-expanded={navOpen} onClick={() => setNavOpen((v) => !v)}>
+          <span>{section}</span>
+          <span>{navOpen ? "▲" : "▼"}</span>
+        </button>
+
         <p className="ad-label">MIXBAR / CONTROL CENTER</p>
 
-        <nav className="ad-nav" aria-label="Admin navigation">
+        <nav className={navOpen ? "ad-nav open" : "ad-nav"} aria-label="Admin navigation">
           {navigation.map((item) => (
             <button
               key={item.name}
               type="button"
               className={section === item.name ? "ad-nav-item active" : "ad-nav-item"}
               onClick={() => {
+                setNavOpen(false);
                 if ("Notification" in window && Notification.permission === "default") {
                   Notification.requestPermission();
                 }

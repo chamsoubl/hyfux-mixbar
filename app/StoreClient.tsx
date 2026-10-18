@@ -373,6 +373,7 @@ export default function HomePage() {
   const [showCheckout, setShowCheckout] = useState(false);
   const [notice, setNotice] = useState('');
   const [placing, setPlacing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const placingRef = useRef(false);
   const [fulfillmentSetting, setFulfillmentSetting] = useState<'delivery' | 'pickup' | 'both'>('both');
   const [defaultFee, setDefaultFee] = useState(0);
@@ -927,12 +928,13 @@ export default function HomePage() {
         <div className="hx-container hx-header-inner">
           <Logo />
 
-          <nav className="hx-nav" aria-label="Main navigation">
+          <nav className={`hx-nav ${menuOpen ? 'hx-nav-open' : ''}`} aria-label="Main navigation">
             {navLinks.map((link) => (
               <a
                 key={link.id}
                 href={link.href ?? `#${link.id}`}
                 aria-current={activeSection === link.id ? 'true' : undefined}
+                onClick={() => setMenuOpen(false)}
               >
                 {link.label}
               </a>
@@ -948,6 +950,15 @@ export default function HomePage() {
             <CartIcon size={19} />
             My Cart
             <span className="hx-cart-count">{cartCount}</span>
+          </button>
+          <button
+            type="button"
+            className="hx-menu-btn"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-expanded={menuOpen}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {menuOpen ? '✕' : '☰'}
           </button>
         </div>
       </header>
