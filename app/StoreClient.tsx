@@ -339,6 +339,23 @@ function Stars({ value, label }: { value: number; label: string }) {
 }
 
 export default function HomePage() {
+  useEffect(() => {
+    // Always open at the top, so the open/closed bar is the first thing seen.
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    if (window.location.hash) {
+      window.history.replaceState(
+        null,
+        '',
+        window.location.pathname + window.location.search,
+      );
+    }
+    window.scrollTo(0, 0);
+    const timer = window.setTimeout(() => window.scrollTo(0, 0), 300);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
