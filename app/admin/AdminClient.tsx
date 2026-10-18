@@ -570,7 +570,7 @@ h1, h2, h3, p { margin: 0; }
   cursor: pointer;
 }
 .ad-menu-order-count {
-  margin-left: auto;
+  margin-left: 8px;
   margin-right: 10px;
   padding: 4px 8px;
   border-radius: 999px;
@@ -581,7 +581,7 @@ h1, h2, h3, p { margin: 0; }
   letter-spacing: 0.08em;
 }
 .ad-menu-low-count {
-  margin-left: 6px;
+  margin-left: 8px;
   margin-right: 10px;
   padding: 4px 6px;
   border-radius: 999px;
@@ -609,6 +609,7 @@ h1, h2, h3, p { margin: 0; }
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
+.ad-menu-btn > span:first-child { flex: 1; text-align: left; }
 .ad-nav-item:hover { color: #fff; border-color: rgba(0, 240, 230, 0.28); }
 .ad-nav-item.active {
   color: var(--teal);
@@ -3448,7 +3449,7 @@ export default function AdminPage() {
         <button type="button" className="ad-menu-btn" aria-expanded={navOpen} onClick={() => setNavOpen((v) => !v)}>
           <span>{section}</span>
           {waiting > 0 && <span className="ad-menu-order-count" aria-label={`${waiting} new orders`}>{waiting} NEW</span>}
-          {lowStockCount > 0 && <span className="ad-menu-low-count" aria-label={`${lowStockCount} low stock items`}>{lowStockCount} LOW STOCK</span>}
+          {lowStockCount > 0 && <span className="ad-menu-low-count" aria-label={`${lowStockCount} low stock items`}>{lowStockCount} LOW</span>}
           <span>{navOpen ? "▲" : "▼"}</span>
         </button>
 
