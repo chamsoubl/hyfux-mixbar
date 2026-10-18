@@ -211,6 +211,31 @@ function whatsappLink(phone?: string | null, text?: string) {
   else if (digits.startsWith("0")) digits = "213" + digits.slice(1);
   return `https://wa.me/${digits}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
 }
+function showAdminNotification(title: string, body: string, tag?: string) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const options: NotificationOptions = {
+    body,
+    icon: "/admin-icon-192.png",
+    badge: "/admin-icon-192.png",
+    tag,
+    data: { url: "/admin" },
+  };
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((registration) => registration.showNotification(title, options))
+      .catch(() => {
+        try {
+          new Notification(title, options);
+        } catch {}
+      });
+    return;
+  }
+  try {
+    new Notification(title, options);
+  } catch {}
+}
+
 function notifyNewOrder() {
   try {
     const AC =
@@ -230,9 +255,7 @@ function notifyNewOrder() {
       });
     }
   } catch {}
-  if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("New order! 🍹", { body: "Open the admin panel to accept it." });
-  }
+  showAdminNotification("New order! 🍹", "Open the admin panel to accept it.", "new-order");
 }
 
 function notifyLowStock(item: Partial<InvItem>) {
@@ -245,10 +268,11 @@ function notifyLowStock(item: Partial<InvItem>) {
   }
   if (window.sessionStorage.getItem(key)) return;
   window.sessionStorage.setItem(key, "1");
-  new Notification("Low stock alert", {
-    body: `${item.name || "An inventory item"}: ${Number(item.stock)} ${item.unit || "units"} left (alert at ${Number(item.low_stock_threshold)}).`,
-    tag: `low-stock-${item.id}`,
-  });
+  showAdminNotification(
+    "Low stock alert",
+    `${item.name || "An inventory item"}: ${Number(item.stock)} ${item.unit || "units"} left (alert at ${Number(item.low_stock_threshold)}).`,
+    `low-stock-${item.id}`
+  );
 }
 
 function isToday(iso: string) {
