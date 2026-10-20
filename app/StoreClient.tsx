@@ -36,6 +36,7 @@ type Review = {
   comment: string | null;
   customer_name: string | null;
   created_at: string;
+  verified?: boolean;
 };
 
 type StoreHours = {
@@ -339,6 +340,39 @@ function Stars({ value, label }: { value: number; label: string }) {
   );
 }
 
+function CommunityReviewForm() {
+  const [name, setName] = useState('');
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    const { error } = await supabase.rpc('submit_community_review', {
+      p_name: name.trim(), p_rating: rating, p_comment: comment.trim(),
+    });
+    setBusy(false);
+    setMessage(error ? 'We could not submit your review. Please try again.' : 'Thank you for your feedback! Your review has been received and will appear on the site soon.');
+    if (!error) { setName(''); setComment(''); setRating(5); }
+  }
+
+  return (
+    <form onSubmit={submit} style={{ marginTop: 30, maxWidth: 620, padding: 24, border: '1px solid var(--line)', borderRadius: 18 }}>
+      <h3 style={{ fontSize: 20, fontWeight: 800 }}>Leave a review</h3>
+      <p className="hx-section-description">Anyone can share feedback. We’d love to hear your experience.</p>
+      <label style={{ display: 'block', marginTop: 16 }}>Your name<input required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} style={reviewInputStyle} /></label>
+      <label style={{ display: 'block', marginTop: 12 }}>Rating<select value={rating} onChange={(e) => setRating(Number(e.target.value))} style={reviewInputStyle}>{[5,4,3,2,1].map((n) => <option key={n} value={n}>{n} {n === 1 ? 'star' : 'stars'}</option>)}</select></label>
+      <label style={{ display: 'block', marginTop: 12 }}>Your review<textarea maxLength={1000} rows={4} value={comment} onChange={(e) => setComment(e.target.value)} style={reviewInputStyle} /></label>
+      <button type="submit" disabled={busy} className="hx-btn hx-btn-outline hx-btn-sm" style={{ marginTop: 16 }}>{busy ? 'Sending…' : 'Send for approval'}</button>
+      {message && <p role="status" style={{ marginTop: 12 }}>{message}</p>}
+    </form>
+  );
+}
+
+const reviewInputStyle: React.CSSProperties = { display: 'block', width: '100%', marginTop: 6, padding: '12px 14px', borderRadius: 10, border: '1px solid var(--line)', background: '#07151b', color: 'var(--text)' };
+
 export default function HomePage() {
   useEffect(() => {
     // Always open at the top, so the open/closed bar is the first thing seen.
@@ -428,7 +462,9 @@ export default function HomePage() {
       const { data, error: reviewsError } = await supabase.rpc('get_public_reviews');
 
       if (!cancelled && !reviewsError) {
-        setReviews((data ?? []) as Review[]);
+        const verified = ((data ?? []) as Review[]).map((review) => ({ ...review, verified: true }));
+        const community = await supabase.rpc('get_public_community_reviews');
+        setReviews([...verified, ...(!community.error ? (community.data ?? []) as Review[] : [])]);
       }
     }
 
@@ -1371,7 +1407,7 @@ export default function HomePage() {
               The love is <span className="hx-gradient-text">real</span>
             </h2>
             <p className="hx-section-description">
-              Feedback from customers who have experienced HYFUX.
+              Feedback from our community. Reviews are checked before they appear.
             </p>
           </div>
 
@@ -1393,7 +1429,7 @@ export default function HomePage() {
                   label={`${averageRating.toFixed(1)} out of 5 stars`}
                 />
                 <div className="hx-review-summary-title">
-                  Verified customer ratings
+                  Community ratings
                 </div>
                 <div className="hx-review-summary-sub">
                   Based on {reviews.length} published review
@@ -1420,7 +1456,7 @@ export default function HomePage() {
                     {review.customer_name || 'HYFUX customer'}
                   </div>
 
-                  <span className="hx-verified">✓ Verified customer</span>
+                  <span className="hx-verified">{review.verified ? '✓ Verified customer' : '✓ Approved review'}</span>
                 </article>
               ))}
             </div>
@@ -1430,14 +1466,14 @@ export default function HomePage() {
             <Stars value={0} label="No ratings yet" />
             <h3>Your review could be next.</h3>
             <p className="hx-section-description">
-              Customer reviews will appear here after verified orders have
-              been reviewed and published.
+              Share your experience. Every review is checked before publication.
             </p>
             <a href="/track" className="hx-btn hx-btn-outline hx-btn-sm">
               Find your order
             </a>
           </div>
         )}
+        <CommunityReviewForm />
       </section>
 
       {/* CALL TO ACTION */}

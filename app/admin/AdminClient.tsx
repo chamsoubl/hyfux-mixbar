@@ -2110,6 +2110,29 @@ function Reviews({ reviews, onToggle }: { reviews: Review[]; onToggle: (r: Revie
   );
 }
 
+function CommunityReviews({ onError }: { onError: (message: string) => void }) {
+  const [items, setItems] = useState<{ id: string; name: string; rating: number; comment: string | null; created_at: string; approved: boolean }[]>([]);
+  const [busy, setBusy] = useState('');
+  const load = useCallback(async () => {
+    const { data, error } = await supabase.rpc('admin_community_reviews');
+    if (error) onError(`Community reviews could not be loaded: ${error.message}`);
+    else setItems((data ?? []) as typeof items);
+  }, [onError]);
+  useEffect(() => { void load(); }, [load]);
+  async function decide(id: string, approved: boolean) {
+    setBusy(id);
+    const { error } = await supabase.rpc('moderate_community_review', { p_id: id, p_approved: approved });
+    setBusy('');
+    if (error) onError(`Could not update review: ${error.message}`); else await load();
+  }
+  return <Panel title="Community review submissions" sub="Approve a review to publish it, or reject it to keep it off the site.">
+    {items.length === 0 ? <div className="ad-empty">No community reviews waiting or published.</div> : items.map((r) => <div className="ad-product-row" key={r.id} style={{ flexWrap: 'wrap' }}>
+      <div className="ad-product-info"><strong>{r.name} <span className="ad-stars">{'★'.repeat(r.rating)}</span> {r.approved ? <span className="ad-hidden-tag ok">PUBLISHED</span> : <span className="ad-hidden-tag">PENDING</span>}</strong><small>{r.comment || 'No comment'}</small></div>
+      {!r.approved ? <><button disabled={busy === r.id} className="ad-link-btn" onClick={() => void decide(r.id, true)}>Approve</button><button disabled={busy === r.id} className="ad-link-btn danger" onClick={() => void decide(r.id, false)}>Reject</button></> : <button disabled={busy === r.id} className="ad-link-btn danger" onClick={() => void decide(r.id, false)}>Unpublish</button>}
+    </div>)}
+  </Panel>;
+}
+
 /* ====================================================================== */
 /* Inventory                                                               */
 /* ====================================================================== */
@@ -3385,6 +3408,7 @@ export default function AdminPage() {
     { name: "Finance & Profit", icon: <CoinIcon size={19} /> },
     { name: "Customers", icon: <UsersIcon size={19} /> },
     { name: "Reviews", icon: <StarIcon size={19} /> },
+    { name: "Community Reviews", icon: <StarIcon size={19} /> },
     { name: "Inventory", icon: <BoxIcon size={19} /> },
     { name: "Store Settings", icon: <SlidersIcon size={19} /> },
     { name: "Security", icon: <ShieldIcon size={19} /> },
@@ -4047,6 +4071,7 @@ export default function AdminPage() {
         {section === "Customers" && <Customers orders={orders} onChange={loadOrders} onError={report} />}
 
         {section === "Reviews" && <Reviews reviews={reviews} onToggle={toggleReviewHidden} />}
+        {section === "Community Reviews" && <CommunityReviews onError={report} />}
 
         {section === "Inventory" && <Inventory orders={orders} products={products} onError={report} />}
 

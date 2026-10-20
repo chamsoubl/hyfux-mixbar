@@ -1715,7 +1715,12 @@
 
           .hx-footer-inner {
             flex-direction: column;
-            align-items: flex-start;
+            align-items: center;
+            text-align: center;
+          }
+
+          .hx-footer-links {
+            justify-content: center;
           }
 
           .hx-tagline {
