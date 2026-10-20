@@ -350,12 +350,24 @@ function CommunityReviewForm() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
-    const { error } = await supabase.rpc('submit_community_review', {
-      p_name: name.trim(), p_rating: rating, p_comment: comment.trim(),
-    });
-    setBusy(false);
-    setMessage(error ? 'We could not submit your review. Please try again.' : 'Thank you for your feedback! Your review has been received and will appear on the site soon.');
-    if (!error) { setName(''); setComment(''); setRating(5); }
+    setMessage('');
+    try {
+      const { error } = await supabase.rpc('submit_community_review', {
+        p_name: name.trim(), p_rating: rating, p_comment: comment.trim() || null,
+      });
+      if (error) {
+        console.error('Community review submission failed:', error);
+        setMessage(`Could not submit review: ${error.message}`);
+      } else {
+        setName(''); setComment(''); setRating(5);
+        setMessage('Thank you for your feedback! Your review has been received and will appear on the site soon.');
+      }
+    } catch (error) {
+      console.error('Community review submission failed:', error);
+      setMessage('Could not reach the review service. Check your connection and try again.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -366,7 +378,7 @@ function CommunityReviewForm() {
       <label style={{ display: 'block', marginTop: 12 }}>Rating<select value={rating} onChange={(e) => setRating(Number(e.target.value))} style={reviewInputStyle}>{[5,4,3,2,1].map((n) => <option key={n} value={n}>{n} {n === 1 ? 'star' : 'stars'}</option>)}</select></label>
       <label style={{ display: 'block', marginTop: 12 }}>Your review<textarea maxLength={1000} rows={4} value={comment} onChange={(e) => setComment(e.target.value)} style={reviewInputStyle} /></label>
       <button type="submit" disabled={busy} className="hx-btn hx-btn-outline hx-btn-sm" style={{ marginTop: 16 }}>{busy ? 'Sending…' : 'Send for approval'}</button>
-      {message && <p role="status" style={{ marginTop: 12 }}>{message}</p>}
+      {message && <p role={message.startsWith('Could not') ? 'alert' : 'status'} style={{ marginTop: 12 }}>{message}</p>}
     </form>
   );
 }

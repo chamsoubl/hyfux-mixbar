@@ -65,3 +65,5 @@ end;
 $$;
 revoke all on function public.moderate_community_review(uuid, boolean) from public;
 grant execute on function public.moderate_community_review(uuid, boolean) to authenticated;
+
+notify pgrst, 'reload schema';
