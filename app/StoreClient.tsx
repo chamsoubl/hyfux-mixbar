@@ -86,6 +86,9 @@ const SOCIAL_LINKS = {
   tiktok: 'https://www.tiktok.com/@chamsou_.bl',
   whatsapp: `https://wa.me/${WHATSAPP_PHONE}`,
 };
+const SUPPORT_LINK = `${SOCIAL_LINKS.whatsapp}?text=${encodeURIComponent(
+  'Hi HYFUX, I need help with the website.',
+)}`;
 
 const navLinks: { id: string; label: string; href?: string }[] = [
   { id: 'home', label: 'Home' },
@@ -1533,6 +1536,16 @@ export default function HomePage() {
                 </a>
               ))}
             </nav>
+
+            <a
+              className="hx-support-link"
+              href={SUPPORT_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <WhatsAppIcon size={18} />
+              Contact support
+            </a>
 
             <div className="hx-social">
               <a

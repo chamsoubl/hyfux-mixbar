@@ -1181,6 +1181,25 @@
           color: var(--teal);
         }
 
+        .hx-support-link {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 10px 14px;
+          border: 1px solid rgba(0, 240, 230, 0.55);
+          border-radius: 999px;
+          color: var(--teal);
+          font-size: 12px;
+          font-weight: 700;
+          transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .hx-support-link:hover {
+          background: var(--teal);
+          color: #021012;
+        }
+
         .hx-social {
           display: flex;
           gap: 12px;
