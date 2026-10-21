@@ -500,29 +500,34 @@ export default function HomePage() {
       setLoading(true);
       setError('');
 
-      const settingsResult = await supabase
+      // Load the menu independently from shop status. A slow settings
+      // request should not keep product prices behind the loading skeleton.
+      const settingsRequest = supabase
         .from('business_settings')
         .select('is_open, opens_at, closes_at, closed_days')
         .eq('id', 1)
         .maybeSingle();
 
-      if (cancelled) return;
+      void settingsRequest.then(({ data, error: settingsError }) => {
+        if (cancelled) return;
 
-      if (settingsResult.error || !settingsResult.data) {
-        setShopOpen(null);
-        setError(
-          'We could not verify shop availability. Ordering is disabled until the status is confirmed.',
-        );
-      } else {
-        setShopOpen(Boolean(settingsResult.data.is_open));
+        if (settingsError || !data) {
+          setShopOpen(null);
+          setError(
+            'We could not verify shop availability. Ordering is disabled until the status is confirmed.',
+          );
+          return;
+        }
+
+        setShopOpen(Boolean(data.is_open));
         setShopHours({
-          opens_at: settingsResult.data.opens_at ?? null,
-          closes_at: settingsResult.data.closes_at ?? null,
-          closed_days: Array.isArray(settingsResult.data.closed_days)
-            ? settingsResult.data.closed_days.map(Number)
+          opens_at: data.opens_at ?? null,
+          closes_at: data.closes_at ?? null,
+          closed_days: Array.isArray(data.closed_days)
+            ? data.closed_days.map(Number)
             : [],
         });
-      }
+      });
 
       await refreshProducts();
       if (cancelled) return;
