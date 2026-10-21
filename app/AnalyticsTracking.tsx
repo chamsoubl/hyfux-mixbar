@@ -21,6 +21,7 @@ export default function AnalyticsTracking() {
   useEffect(() => {
     const me = new URLSearchParams(window.location.search).get('me');
     const optedOutFromQuery = me === '1' || me === '2';
+    const isProductionSite = window.location.hostname === 'hyfux-mixbar.vercel.app';
 
     if (optedOutFromQuery) {
       try {
@@ -37,7 +38,7 @@ export default function AnalyticsTracking() {
       // If storage is unavailable, keep the visit tracked unless ?me=1 was used.
     }
 
-    setShouldTrack(!isInternal);
+    setShouldTrack(isProductionSite && !isInternal);
   }, []);
 
   useEffect(() => {
