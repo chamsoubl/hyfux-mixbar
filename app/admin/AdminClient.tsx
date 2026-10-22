@@ -3488,6 +3488,7 @@ export default function AdminPage() {
           <span>{section}</span>
           {waiting > 0 && <span className="ad-menu-order-count" aria-label={`${waiting} new orders`}>{waiting} NEW</span>}
           {lowStockCount > 0 && <span className="ad-menu-low-count" aria-label={`${lowStockCount} low stock items`}>{lowStockCount} LOW</span>}
+          {communityReviewCount > 0 && <span className="ad-menu-low-count" aria-label={`${communityReviewCount} pending community reviews`}>{communityReviewCount} REVIEWS</span>}
           <span>{navOpen ? "▲" : "▼"}</span>
         </button>
 
