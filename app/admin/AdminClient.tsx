@@ -2941,6 +2941,7 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [communityReviewCount, setCommunityReviewCount] = useState(0);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [message, setMessage] = useState("");
@@ -3050,6 +3051,14 @@ export default function AdminPage() {
     if (!error) setReviews((data ?? []) as unknown as Review[]);
   }, []);
 
+  const loadCommunityReviewCount = useCallback(async () => {
+    const { data, error } = await supabase.rpc("admin_community_reviews");
+    if (!error) {
+      const pending = (data ?? []).filter((review: { approved?: boolean }) => !review.approved).length;
+      setCommunityReviewCount(pending);
+    }
+  }, []);
+
   const loadExpenses = useCallback(async () => {
     const { data, error } = await supabase
       .from(T_EXPENSES)
@@ -3076,7 +3085,7 @@ export default function AdminPage() {
       setLoading(true);
       try {
         const ok = await loadProducts();
-        await Promise.all([loadOrders(), loadReviews(), loadExpenses(), loadSettings(), loadLowStockCount()]);
+        await Promise.all([loadOrders(), loadReviews(), loadExpenses(), loadSettings(), loadLowStockCount(), loadCommunityReviewCount()]);
         if (alive) setConnected(ok);
       } catch {
         if (alive) report("Could not connect to Supabase.");
@@ -3099,11 +3108,16 @@ export default function AdminPage() {
       })
       .subscribe();
 
+    const communityReviewPoll = window.setInterval(() => {
+      void loadCommunityReviewCount();
+    }, 30000);
+
     return () => {
       alive = false;
+      window.clearInterval(communityReviewPoll);
       supabase.removeChannel(channel);
     };
-  }, [session, loadProducts, loadOrders, loadReviews, loadExpenses, loadSettings, loadLowStockCount, report]);
+  }, [session, loadProducts, loadOrders, loadReviews, loadExpenses, loadSettings, loadLowStockCount, loadCommunityReviewCount, report]);
 
   /* ---------- Products ---------- */
   function openNewProduct() {
@@ -3499,6 +3513,9 @@ export default function AdminPage() {
               {item.name}
               {item.name === "Orders" && (
                 <span className="ad-nav-tag">{waiting > 0 ? `${waiting} NEW` : "LIVE"}</span>
+              )}
+              {item.name === "Community Reviews" && communityReviewCount > 0 && (
+                <span className="ad-nav-tag">{communityReviewCount} NEW</span>
               )}
               {item.name === "Inventory" && lowStockCount > 0 && (
                 <span className="ad-nav-tag low">{lowStockCount} LOW STOCK</span>
