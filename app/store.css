@@ -134,6 +134,11 @@
           letter-spacing: 0.14em;
         }
 
+        .hx-statusbar-location {
+          font-weight: 800;
+          letter-spacing: 0.02em;
+        }
+
         .hx-statusbar-open {
           background: #00f0e6;
         }

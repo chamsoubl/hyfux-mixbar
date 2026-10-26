@@ -302,6 +302,7 @@ function StatusBar({ shopOpen, hours }: { shopOpen: boolean | null; hours: Store
       <span className="hx-status-dot" />
       <strong>{copy.title}</strong>
       <span className="hx-statusbar-sub">{copy.sub}</span>
+      <span className="hx-statusbar-location">📍 Find us at CEFOS, the accommodation college</span>
     </div>
   );
 }
@@ -1395,7 +1396,7 @@ export default function HomePage() {
           </div>
 
           <div className="hx-about-copy-wrap">
-            <p className="hx-eyebrow hx-eyebrow-sm">About HYFUX MIXBAR</p>
+            <p className="hx-eyebrow hx-eyebrow-sm">At CEFOS accommodation college</p>
             <h2 className="hx-title">
               A mix of passion,
               <br />
@@ -1403,10 +1404,10 @@ export default function HomePage() {
             </h2>
 
             <p className="hx-about-copy">
-              At HYFUX MIXBAR, we create more than just drinks. We create
-              moments. Our unique blends, fresh ingredients and bold flavours
-              are designed to bring people together and make every sip
-              special.
+              HYFUX MIXBAR is here at CEFOS, the accommodation college. We make
+              fresh, flavourful drinks right here for the students and everyone
+              around campus. Drop by, find your favourite, and enjoy a little
+              refreshment close to home.
             </p>
 
             <Perks />
