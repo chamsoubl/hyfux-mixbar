@@ -134,11 +134,6 @@
           letter-spacing: 0.14em;
         }
 
-        .hx-statusbar-location {
-          font-weight: 800;
-          letter-spacing: 0.02em;
-        }
-
         .hx-statusbar-open {
           background: #00f0e6;
         }
@@ -405,6 +400,20 @@
           font-weight: 800;
           letter-spacing: 0.16em;
           text-transform: uppercase;
+        }
+
+        .hx-hero-location {
+          display: table;
+          margin-bottom: 14px;
+          padding: 9px 14px;
+          border: 1px solid rgba(0, 240, 230, 0.55);
+          border-radius: 999px;
+          background: rgba(3, 8, 11, 0.78);
+          color: #fff;
+          font-size: 13px;
+          font-weight: 800;
+          line-height: 1.4;
+          box-shadow: 0 0 22px rgba(0, 240, 230, 0.14);
         }
 
         .hx-status-open {

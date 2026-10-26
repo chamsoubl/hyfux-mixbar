@@ -302,7 +302,6 @@ function StatusBar({ shopOpen, hours }: { shopOpen: boolean | null; hours: Store
       <span className="hx-status-dot" />
       <strong>{copy.title}</strong>
       <span className="hx-statusbar-sub">{copy.sub}</span>
-      <span className="hx-statusbar-location">📍 Find us at CEFOS, the accommodation college</span>
     </div>
   );
 }
@@ -1130,6 +1129,7 @@ export default function HomePage() {
 
         <div className="hx-container hx-hero-grid">
           <div>
+            <p className="hx-hero-location">📍 We&apos;re at CEFOS, the accommodation college</p>
             <span
               className={`hx-status ${
                 shopOpen === true
